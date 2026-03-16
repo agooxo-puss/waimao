@@ -44,6 +44,60 @@ async function getBingImage(keyword) {
   }
 }
 
+async function cleanAM730Content(content) {
+  if (!content) return content;
+  
+  const lines = content.split('\n');
+  const cleanedLines = [];
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Skip empty lines and very short lines
+    if (trimmed.length < 5) continue;
+    
+    // Skip navigation/header content
+    if (trimmed === '返回' || trimmed === '新聞' || trimmed === '財經' || 
+        trimmed === '體育' || trimmed === '娛樂' || trimmed === '生活' ||
+        trimmed.includes('出版：') || trimmed.includes('更新：') ||
+        trimmed.includes('ADVERTISEMENT') || trimmed.includes('立即更新') ||
+        trimmed.includes('AM730手機APP') || trimmed.includes('下載') ||
+        trimmed.includes('體驗升級功能')) {
+      continue;
+    }
+    
+    // Skip video player controls and UI elements
+    if (trimmed === 'Picture-in-Picture' || trimmed === 'Fullscreen' || 
+        trimmed === 'Mute' || trimmed === 'Play' || trimmed === 'Stop' ||
+        trimmed.includes('Video Player') || trimmed.includes('Pause') || 
+        trimmed.includes('Unmute') || trimmed.includes('Loaded:') || 
+        trimmed.includes('Remaining Time') || trimmed.match(/-\d+:\d+/) || 
+        trimmed.match(/\d+%/)) {
+      continue;
+    }
+    
+    // Skip footer content
+    if (trimmed.includes('版權所有') || trimmed.includes('©') || 
+        trimmed.includes('All rights reserved') || trimmed.includes('聯絡我們') ||
+        trimmed.includes('廣告查詢') || trimmed.includes('私隱政策') ||
+        trimmed.includes('免責聲明')) {
+      break;
+    }
+    
+    // Skip author labels that are not part of main content
+    if (trimmed === '730社論' || trimmed === '投資專欄: 彭偉新' || 
+        trimmed === '投資無界限：李慧芬' || trimmed === '小強看世界' ||
+        trimmed === 'Renee專訪' || trimmed.includes('專欄') ||
+        trimmed.includes('社論') || trimmed.includes('作者：')) {
+      continue;
+    }
+    
+    cleanedLines.push(trimmed);
+  }
+  
+  return cleanedLines.join('\n');
+}
+
 async function getArticleContent(page, url) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -51,7 +105,13 @@ async function getArticleContent(page, url) {
     
     // Try to get article content
     const content = await page.evaluate(() => {
-      // Try various selectors for article content
+      // Try specific am730 selectors
+      const articleDiv = document.querySelector('.article-detail__content');
+      if (articleDiv) {
+        return articleDiv.innerText;
+      }
+      
+      // Try other selectors
       const selectors = [
         '.article-content',
         '.article-body', 
@@ -78,7 +138,7 @@ async function getArticleContent(page, url) {
       return paras || document.body.innerText.substring(0, 2000);
     });
     
-    return content;
+    return cleanAM730Content(content);
   } catch (e) {
     console.log('Error getting content:', e.message);
     return null;
