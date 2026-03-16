@@ -13,7 +13,7 @@ const categoryNames = {
   sports: "體育",
   culture: "文化",
   business: "商業",
-  macaodaily: "澳門日报"
+  macaodaily: "澳門日報"
 }
 
 function LoginModal({ onLogin, onClose }) {
@@ -206,7 +206,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
                   <option value="sports">體育</option>
                   <option value="culture">文化</option>
                   <option value="business">商業</option>
-                  <option value="macaodaily">澳門日报</option>
+                  <option value="macaodaily">澳門日報</option>
                 </select>
               </div>
               <div className="form-group">
@@ -376,7 +376,7 @@ function App() {
                   className={`category-tab ${category === "macaodaily" ? "active" : ""}`}
                   onClick={() => setCategory("macaodaily")}
                 >
-                  澳門日报
+                  澳門日報
                 </button>
               </div>
             </section>
