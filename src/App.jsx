@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useParams, Link, useNavigate } from 'react-router-dom'
 import './App.css'
 
 const supabaseUrl = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co'
@@ -384,6 +385,7 @@ function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   const fetchArticles = async () => {
     setLoading(true)
@@ -442,7 +444,7 @@ function App() {
           <div className="loading">載入中...</div>
         ) : articles.length > 0 ? (
           <>
-            <section className="hero" onClick={() => setSelectedArticle(articles[0])}>
+            <section className="hero" onClick={() => navigate(`/article/${articles[0].id}`)}>
               <img src={getImage(articles[0])} alt="Featured" className="hero-image" />
               <div className="hero-overlay"></div>
               <div className="hero-content">
@@ -511,7 +513,7 @@ function App() {
                   <article 
                     key={article.id} 
                     className="news-card"
-                    onClick={() => setSelectedArticle(article)}
+                    onClick={() => navigate(`/article/${article.id}`)}
                   >
                     <div className="card-image">
                       <img src={getImage(article)} alt={article.title} loading="lazy" />
@@ -592,4 +594,93 @@ function App() {
   )
 }
 
-export default App
+function ArticlePage() {
+  const { id } = useParams()
+  const [article, setArticle] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [related, setRelated] = useState([])
+  
+  useEffect(() => {
+    async function fetchArticle() {
+      setLoading(true)
+      try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/articles?id=eq.${id}`, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        })
+        const data = await res.json()
+        if (data.length > 0) {
+          setArticle(data[0])
+          
+          // Fetch related articles
+          const relatedRes = await fetch(`${supabaseUrl}/rest/v1/articles?category=eq.${data[0].category}&id=neq.${id}&limit=4`, {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          })
+          const relatedData = await relatedRes.json()
+          setRelated(relatedData || [])
+        }
+      } catch (err) {
+        console.error(err)
+      }
+      setLoading(false)
+    }
+    fetchArticle()
+  }, [id])
+  
+  if (loading) return <div className="loading">載入中...</div>
+  if (!article) return <div className="loading">文章不存在</div>
+  
+  return (
+    <div className="article-page">
+      <header className="article-header">
+        <Link to="/" className="back-link">← 返回首頁</Link>
+      </header>
+      <article className="article-content">
+        <img src={getImage(article)} alt={article.title} className="article-hero-image" />
+        <div className="article-text">
+          <span className="article-badge">{categoryNames[article.category]}</span>
+          <h1 className="article-title">{article.title}</h1>
+          <div className="article-meta">
+            <span className="author">{article.author}</span>
+            <span className="date">{article.date}</span>
+          </div>
+          <div className="article-body" dangerouslySetInnerHTML={{ __html: article.content }}></div>
+        </div>
+      </article>
+      
+      {related.length > 0 && (
+        <section className="related-section">
+          <h3>相關文章</h3>
+          <div className="news-grid">
+            {related.map(a => (
+              <Link to={`/article/${a.id}`} key={a.id} className="news-card">
+                <div className="card-image">
+                  <img src={getImage(a)} alt={a.title} />
+                </div>
+                <div className="card-content">
+                  <h3 className="card-title">{a.title}</h3>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+export default function AppWrapper() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/article/:id" element={<ArticlePage />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
