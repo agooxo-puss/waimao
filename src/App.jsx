@@ -16,13 +16,22 @@ const categoryNames = {
   macaodaily: "澳門"
 }
 
-const MACAU_IMAGE = 'https://cdn.discordapp.com/attachments/1482661602204582019/1482981824048402462/MobileMacau_Tourist_Info_Hero_Banner.jpg?ex=69b8edf3&is=69b79c73&hm=e222a8a366f5b8a4632cb2a7f85c85455990fae57203da73eeb249474896f57d&'
+const MACAU_IMAGE = 'https://images.unsplash.com/photo-1566603582824-1366035c4b49?w=800&h=500&fit=crop'
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop'
+
+const CATEGORY_IMAGES = {
+  world: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop',
+  tech: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=500&fit=crop',
+  sports: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800&h=500&fit=crop',
+  culture: 'https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=800&h=500&fit=crop',
+  business: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&h=500&fit=crop',
+  macaodaily: 'https://images.unsplash.com/photo-1566603582824-1366035c4b49?w=800&h=500&fit=crop'
+}
 
 function getImage(article) {
   if (article.image) return article.image
   if (article.category === 'macaodaily') return MACAU_IMAGE
-  return DEFAULT_IMAGE
+  return CATEGORY_IMAGES[article.category] || DEFAULT_IMAGE
 }
 
 function LoginModal({ onLogin, onClose }) {
@@ -102,23 +111,18 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     }
   }
 
-  const checkAndFixImage = async (imgUrl, articleTitle) => {
+  const checkAndFixImage = async (imgUrl, articleCategory) => {
     if (!imgUrl) {
-      // Generate search URL from title
-      const keywords = articleTitle.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ').trim().split(' ').slice(0, 2).join(',');
-      return `https://source.unsplash.com/800x500/?${encodeURIComponent(keywords)}`;
+      return CATEGORY_IMAGES[articleCategory] || DEFAULT_IMAGE;
     }
     
     try {
       const res = await fetch(imgUrl, { method: 'HEAD' });
       if (!res.ok) {
-        // Image not accessible, generate search URL
-        const keywords = articleTitle.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ').trim().split(' ').slice(0, 2).join(',');
-        return `https://source.unsplash.com/800x500/?${encodeURIComponent(keywords)}`;
+        return CATEGORY_IMAGES[articleCategory] || DEFAULT_IMAGE;
       }
     } catch {
-      const keywords = articleTitle.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ').trim().split(' ').slice(0, 2).join(',');
-      return `https://source.unsplash.com/800x500/?${encodeURIComponent(keywords)}`;
+      return CATEGORY_IMAGES[articleCategory] || DEFAULT_IMAGE;
     }
     
     return imgUrl;
@@ -133,7 +137,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`
 
     // Check and fix image if needed
-    const finalImage = await checkAndFixImage(image, title)
+    const finalImage = await checkAndFixImage(image, category)
 
     try {
       const res = await fetch(`${supabaseUrl}/rest/v1/articles`, {
@@ -213,7 +217,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     setMessage('')
 
     // Check and fix image if needed
-    const finalImage = await checkAndFixImage(image, title)
+    const finalImage = await checkAndFixImage(image, category)
 
     try {
       const res = await fetch(`${supabaseUrl}/rest/v1/articles?id=eq.${editingId}`, {
