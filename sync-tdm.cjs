@@ -9,6 +9,63 @@ const https = require('https');
 
 const IMAGE_CACHE = {};
 
+function cleanContent(content) {
+  if (!content) return content;
+  
+  const footerPatterns = [
+    '版權所有',
+    'Cookies',
+    '本網站使用',
+    '瀏覽體驗',
+    '澳門廣播電視',
+    'tdm.com.mo',
+    '本公司',
+    '聯絡我們',
+    '廣告',
+    '回到首頁',
+    '更多新聞',
+    '延伸閱讀',
+    '相關新聞',
+    '請點擊連結',
+    '相關文章',
+    '延伸閱讀',
+    '更多內容'
+  ];
+  
+  const lines = content.split('\n');
+  const cleanedLines = [];
+  let reachedFooter = false;
+  let duplicateStart = false;
+  const seenLines = new Set();
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.length < 5) continue;
+    
+    for (const pattern of footerPatterns) {
+      if (trimmed.includes(pattern)) {
+        reachedFooter = true;
+        break;
+      }
+    }
+    
+    if (reachedFooter) break;
+    
+    // Skip duplicate lines (article content appears twice)
+    if (seenLines.has(trimmed)) {
+      duplicateStart = true;
+      continue;
+    }
+    if (duplicateStart) continue;
+    
+    seenLines.add(trimmed);
+    cleanedLines.push(trimmed);
+  }
+  
+  return cleanedLines.join('\n');
+}
+
 async function getBingImage(keyword) {
   if (IMAGE_CACHE[keyword]) return IMAGE_CACHE[keyword];
   
@@ -153,7 +210,6 @@ async function main() {
           }
         }
         
-        // Try to get link
         const link = li.querySelector('a')?.href;
         
         if (title && title.length >= 10 && link) {
@@ -177,7 +233,8 @@ async function main() {
       }
       
       console.log('Getting content for:', article.title);
-      const content = await getArticleContent(page, article.url);
+      const rawContent = await getArticleContent(page, article.url);
+      const content = cleanContent(rawContent);
       
       const bingImage = await getBingImage(article.title);
       
