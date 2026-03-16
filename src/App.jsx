@@ -328,7 +328,16 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
               </div>
             </div>
             <div className="form-group">
-              <label>上傳圖片</label>
+              <label>圖片 URL</label>
+              <input 
+                type="text" 
+                value={image} 
+                onChange={e => { setImage(e.target.value); setImagePreview(e.target.value || null); }} 
+                placeholder="輸入圖片網址或上傳文件" 
+              />
+            </div>
+            <div className="form-group">
+              <label>或上傳圖片</label>
               <input type="file" accept="image/*" onChange={handleImageChange} className="file-input" />
               {imagePreview && (
                 <div className="image-preview">
