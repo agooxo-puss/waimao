@@ -858,15 +858,15 @@ footer {
 }
 
 .article-content {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 30px 20px;
   background: var(--bg);
 }
 
 .article-hero-image {
   width: 100%;
-  max-width: 800px;
+  max-width: 1000px;
   height: auto;
   max-height: 450px;
   object-fit: cover;
@@ -877,7 +877,7 @@ footer {
 
 .article-text {
   background: var(--surface);
-  padding: 40px;
+  padding: 24px 24px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
