@@ -1,185 +1,420 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
-const articles = [
-  {
-    id: 1,
-    title: "全球氣候峰會達成歷史性協議 各國承諾減排目標",
-    excerpt: "來自190多個國家的代表經過兩週艱苦談判，終於在巴黎氣候峰會上達成共識，承諾在本世紀中葉實現碳中和目標。",
-    category: "world",
-    author: "王明",
-    date: "2026年3月15日",
-    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop",
-    content: `<p>巴黎訊 - 為期兩週的全球氣候峰會於今日落下帷幕，來自190多個國家的代表經過艱苦談判，終於達成歷史性協議。</p><p>根據協議，各國承諾在2030年前將溫室氣體排放量減少50%，並在2050年前實現碳中和目標。這是迄今為止最具雄心的減排承諾。</p><p>聯合國秘書長在閉幕式上表示：「這是人類歷史上的轉折點。我們終於團結起來，共同應對氣候變化這一生存威脅。」</p>`
-  },
-  {
-    id: 2,
-    title: "蘋果發布全新AI助理 顛覆人機互動方式",
-    excerpt: "蘋果公司在今日凌晨的發布會上推出了革命性的AI助理「Apple Intelligence」，宣稱將徹底改變用戶與設備的互動方式。",
-    category: "tech",
-    author: "李華",
-    date: "2026年3月14日",
-    image: "https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=800&h=500&fit=crop",
-    content: `<p>加州庫比蒂諾訊 - 蘋果公司在今日凌晨的特別發布會上正式推出了代號為「Apple Intelligence」的全新AI助理。</p><p>這款AI助理深度整合了iOS系統，可以理解用戶意圖、預測需求，並提供個性化的協助。</p>`
-  },
-  {
-    id: 3,
-    title: "阿根廷奪得世界盃冠軍 梅西終圓夢",
-    excerpt: "在今日舉行的世界盃決賽中，阿根廷通過點球大戰戰勝法國，第三次捧起大力神杯。梅西在比賽中展現出球王風範。",
-    category: "sports",
-    author: "張偉",
-    date: "2026年3月13日",
-    image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&h=500&fit=crop",
-    content: `<p>多哈訊 - 2026年世界盃決賽今日在盧賽爾體育場舉行，阿根廷對陣法國。</p><p>經過90分鐘激戰，雙方戰成2:2平手。加時賽中，梅西打入關鍵進球，將比分改寫為3:2。</p>`
-  },
-  {
-    id: 4,
-    title: "故宮博物院推出數位展覽 讓文物活起來",
-    excerpt: "故宮博物院今日宣布推出全新數位展覽體驗，結合AR/VR技術，讓觀眾能夠近距離欣賞館藏文物，並與之互動。",
-    category: "culture",
-    author: "陳芳",
-    date: "2026年3月12日",
-    image: "https://images.unsplash.com/photo-1566127444979-b3d2b654e3d7?w=800&h=500&fit=crop",
-    content: `<p>北京訊 - 故宮博物院今日舉辦發布會，宣布推出「數位故宮」計畫的全新展覽體驗。</p><p>這次數位展覽結合了增強現實（AR）和虛擬現實（VR）技術。</p>`
-  },
-  {
-    id: 5,
-    title: "比特幣突破10萬美元大關 加密貨幣市場狂歡",
-    excerpt: "比特幣價格今日首次突破10萬美元大關，創下歷史新高。加密貨幣市場迎來新一輪投資熱潮。",
-    category: "business",
-    author: "劉強",
-    date: "2026年3月11日",
-    image: "https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&h=500&fit=crop",
-    content: `<p>紐約訊 - 比特幣價格今日在亞洲交易時段首次突破10萬美元大關，創下歷史新高。</p><p>這一里程碑標誌著加密貨幣在主流金融市場中的地位進一步鞏固。</p>`
-  },
-  {
-    id: 6,
-    title: "SpaceX成功發射火星殖民飛船 人類邁向太空時代",
-    excerpt: "SpaceX今日成功發射了前往火星的殖民飛船，這是人類歷史上首次載人火星任務的實踐。",
-    category: "tech",
-    author: "楊洋",
-    date: "2026年3月10日",
-    image: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&h=500&fit=crop",
-    content: `<p>佛羅里達州訊 - SpaceX今日在肯尼迪航天中心成功發射了「星際飛船」火星殖民飛船。</p><p>這艘載人飛船將攜帶12名宇航員前往火星，進行為期6個月的太空旅行。</p>`
-  }
-]
+const supabaseUrl = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co'
+const supabaseKey = 'sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_'
+
+const ADMIN_USER = 'waimao'
+const ADMIN_PASS = 'waimao123'
 
 const categoryNames = {
   world: "國際",
   tech: "科技",
   sports: "體育",
   culture: "文化",
-  business: "商業"
+  business: "商業",
+  macaodaily: "澳門日报"
+}
+
+function LoginModal({ onLogin, onClose }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (username === ADMIN_USER && password === ADMIN_PASS) {
+      onLogin()
+    } else {
+      setError('❌ 用戶名或密碼錯誤')
+    }
+  }
+
+  return (
+    <div className="admin-overlay">
+      <div className="login-panel">
+        <div className="login-header">
+          <h2>🔐 管理員登入</h2>
+          <button className="admin-close" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>用戶名</label>
+            <input 
+              value={username} 
+              onChange={e => setUsername(e.target.value)} 
+              placeholder="輸入用戶名" 
+            />
+          </div>
+          <div className="form-group">
+            <label>密碼</label>
+            <input 
+              type="password"
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              placeholder="輸入密碼" 
+            />
+          </div>
+          {error && <p className="message" style={{ color: 'red' }}>{error}</p>}
+          <button type="submit" className="submit-btn">登入</button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
+  const [title, setTitle] = useState('')
+  const [excerpt, setExcerpt] = useState('')
+  const [content, setContent] = useState('')
+  const [category, setCategory] = useState('world')
+  const [author, setAuthor] = useState('')
+  const [image, setImage] = useState('')
+  const [imagePreview, setImagePreview] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [activeTab, setActiveTab] = useState('publish')
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('圖片不能超過 5MB')
+        return
+      }
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImage(reader.result)
+        setImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setMessage('')
+
+    const today = new Date()
+    const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`
+
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({
+          title,
+          excerpt,
+          content,
+          category,
+          author: author || '歪貓編輯',
+          date: dateStr,
+          image: image || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop'
+        })
+      })
+
+      if (res.ok) {
+        setMessage('✅ 文章發布成功！')
+        setTitle('')
+        setExcerpt('')
+        setContent('')
+        setAuthor('')
+        setImage('')
+        onRefresh()
+      } else {
+        setMessage('❌ 發布失敗')
+      }
+    } catch (err) {
+      setMessage('❌ 錯誤：' + err.message)
+    }
+
+    setLoading(false)
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('確定要刪除這篇文章嗎？')) return
+    
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/articles?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        }
+      })
+      
+      if (res.ok) {
+        setArticles(articles.filter(a => a.id !== id))
+        alert('✅ 刪除成功！')
+      } else {
+        alert('❌ 刪除失敗')
+      }
+    } catch (err) {
+      alert('❌ 錯誤：' + err.message)
+    }
+  }
+
+  return (
+    <div className="admin-overlay">
+      <div className="admin-panel">
+        <div className="admin-header">
+          <h2>⚙️ 管理後台</h2>
+          <button className="admin-close" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="admin-tabs">
+          <button 
+            className={`admin-tab ${activeTab === 'publish' ? 'active' : ''}`}
+            onClick={() => setActiveTab('publish')}
+          >
+            📝 發布文章
+          </button>
+          <button 
+            className={`admin-tab ${activeTab === 'manage' ? 'active' : ''}`}
+            onClick={() => setActiveTab('manage')}
+          >
+            🗑️ 管理文章
+          </button>
+        </div>
+
+        {activeTab === 'publish' && (
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>標題 *</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} required placeholder="輸入文章標題" />
+            </div>
+            <div className="form-group">
+              <label>摘要</label>
+              <textarea value={excerpt} onChange={e => setExcerpt(e.target.value)} placeholder="輸入文章摘要" rows={2} />
+            </div>
+            <div className="form-group">
+              <label>內容 (HTML)</label>
+              <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="<p>文章內容...</p>" rows={4} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>分類</label>
+                <select value={category} onChange={e => setCategory(e.target.value)}>
+                  <option value="world">國際</option>
+                  <option value="tech">科技</option>
+                  <option value="sports">體育</option>
+                  <option value="culture">文化</option>
+                  <option value="business">商業</option>
+                  <option value="macaodaily">澳門日报</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>作者</label>
+                <input value={author} onChange={e => setAuthor(e.target.value)} placeholder="作者名稱" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>上傳圖片</label>
+              <input type="file" accept="image/*" onChange={handleImageChange} className="file-input" />
+              {imagePreview && (
+                <div className="image-preview">
+                  <img src={imagePreview} alt="預覽" />
+                  <button type="button" className="remove-image" onClick={() => { setImage(''); setImagePreview(null) }}>×</button>
+                </div>
+              )}
+            </div>
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? '發布中...' : '🚀 發布文章'}
+            </button>
+            {message && <p className="message">{message}</p>}
+          </form>
+        )}
+
+        {activeTab === 'manage' && (
+          <div className="article-list">
+            {articles.map(article => (
+              <div key={article.id} className="article-item">
+                <div className="article-info">
+                  <span className="article-title">{article.title}</span>
+                  <span className="article-meta">{article.author} · {article.date}</span>
+                </div>
+                <button 
+                  className="delete-btn"
+                  onClick={() => handleDelete(article.id)}
+                >
+                  🗑️ 刪除
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function App() {
+  const [articles, setArticles] = useState([])
   const [category, setCategory] = useState("all")
   const [selectedArticle, setSelectedArticle] = useState(null)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const fetchArticles = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/articles?order=created_at.desc`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        }
+      })
+      const data = await res.json()
+      setArticles(data || [])
+    } catch (err) {
+      console.error(err)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchArticles()
+  }, [])
+
+  const handleAdminClick = () => {
+    if (isLoggedIn) {
+      setShowAdmin(true)
+    } else {
+      setShowAdmin('login')
+    }
+  }
 
   const filteredArticles = category === "all" 
     ? articles 
     : articles.filter(a => a.category === category)
+
+  const isAdminSite = typeof window !== 'undefined' && window.location.hostname.includes('waimao')
 
   return (
     <>
       <header>
         <div className="header-inner">
           <a href="#" className="logo">歪貓娛樂</a>
-          <nav>
-            <a href="#" className="active">首頁</a>
-            <a href="#">熱門</a>
-            <a href="#">科技</a>
-            <a href="#">運動</a>
-            <a href="#">娛樂</a>
-          </nav>
-          <button className="search-btn">搜尋</button>
+          {isAdminSite && (
+            <nav>
+              <a href="#" className="active">首頁</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); handleAdminClick() }}>管理</a>
+            </nav>
+          )}
+          {isAdminSite && (
+            <button className="admin-btn" onClick={handleAdminClick}>⚙️ 管理</button>
+          )}
         </div>
       </header>
 
       <main>
-        <section className="hero" onClick={() => setSelectedArticle(articles[0])}>
-          <img src={articles[0].image} alt="Featured" className="hero-image" />
-          <div className="hero-overlay"></div>
-          <div className="hero-content">
-            <span className="hero-badge">頭條</span>
-            <h1 className="hero-title">{articles[0].title}</h1>
-            <p className="hero-excerpt">{articles[0].excerpt}</p>
-            <div className="hero-meta">
-              <span>{articles[0].author}</span>
-              <span>·</span>
-              <span>{articles[0].date}</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="categories">
-          <div className="categories-inner container">
-            <button 
-              className={`category-tab ${category === "all" ? "active" : ""}`}
-              onClick={() => setCategory("all")}
-            >
-              全部
-            </button>
-            <button 
-              className={`category-tab ${category === "world" ? "active" : ""}`}
-              onClick={() => setCategory("world")}
-            >
-              國際
-            </button>
-            <button 
-              className={`category-tab ${category === "tech" ? "active" : ""}`}
-              onClick={() => setCategory("tech")}
-            >
-              科技
-            </button>
-            <button 
-              className={`category-tab ${category === "sports" ? "active" : ""}`}
-              onClick={() => setCategory("sports")}
-            >
-              體育
-            </button>
-            <button 
-              className={`category-tab ${category === "culture" ? "active" : ""}`}
-              onClick={() => setCategory("culture")}
-            >
-              文化
-            </button>
-            <button 
-              className={`category-tab ${category === "business" ? "active" : ""}`}
-              onClick={() => setCategory("business")}
-            >
-              商業
-            </button>
-          </div>
-        </section>
-
-        <section className="news-section container">
-          <h2 className="section-title">最新消息</h2>
-          <div className="news-grid">
-            {filteredArticles.map((article) => (
-              <article 
-                key={article.id} 
-                className="news-card"
-                onClick={() => setSelectedArticle(article)}
-              >
-                <div className="card-image">
-                  <img src={article.image} alt={article.title} loading="lazy" />
-                  <span className="card-badge">{categoryNames[article.category]}</span>
+        {loading ? (
+          <div className="loading">載入中...</div>
+        ) : articles.length > 0 ? (
+          <>
+            <section className="hero" onClick={() => setSelectedArticle(articles[0])}>
+              <img src={articles[0].image} alt="Featured" className="hero-image" />
+              <div className="hero-overlay"></div>
+              <div className="hero-content">
+                <span className="hero-badge">頭條</span>
+                <h1 className="hero-title">{articles[0].title}</h1>
+                <p className="hero-excerpt">{articles[0].excerpt}</p>
+                <div className="hero-meta">
+                  <span>{articles[0].author}</span>
+                  <span>·</span>
+                  <span>{articles[0].date}</span>
                 </div>
-                <div className="card-content">
-                  <h3 className="card-title">{article.title}</h3>
-                  <p className="card-excerpt">{article.excerpt}</p>
-                  <div className="card-meta">
-                    <div className="avatar">{article.author[0]}</div>
-                    <span className="author">{article.author}</span>
-                    <span>·</span>
-                    <span>{article.date}</span>
-                  </div>
-                </div>
-              </article>
-            ))}
+              </div>
+            </section>
+
+            <section className="categories">
+              <div className="categories-inner container">
+                <button 
+                  className={`category-tab ${category === "all" ? "active" : ""}`}
+                  onClick={() => setCategory("all")}
+                >
+                  全部
+                </button>
+                <button 
+                  className={`category-tab ${category === "world" ? "active" : ""}`}
+                  onClick={() => setCategory("world")}
+                >
+                  國際
+                </button>
+                <button 
+                  className={`category-tab ${category === "tech" ? "active" : ""}`}
+                  onClick={() => setCategory("tech")}
+                >
+                  科技
+                </button>
+                <button 
+                  className={`category-tab ${category === "sports" ? "active" : ""}`}
+                  onClick={() => setCategory("sports")}
+                >
+                  體育
+                </button>
+                <button 
+                  className={`category-tab ${category === "culture" ? "active" : ""}`}
+                  onClick={() => setCategory("culture")}
+                >
+                  文化
+                </button>
+                <button 
+                  className={`category-tab ${category === "business" ? "active" : ""}`}
+                  onClick={() => setCategory("business")}
+                >
+                  商業
+                </button>
+                <button 
+                  className={`category-tab ${category === "macaodaily" ? "active" : ""}`}
+                  onClick={() => setCategory("macaodaily")}
+                >
+                  澳門日报
+                </button>
+              </div>
+            </section>
+
+            <section className="news-section container">
+              <h2 className="section-title">最新消息</h2>
+              <div className="news-grid">
+                {filteredArticles.map((article) => (
+                  <article 
+                    key={article.id} 
+                    className="news-card"
+                    onClick={() => setSelectedArticle(article)}
+                  >
+                    <div className="card-image">
+                      <img src={article.image} alt={article.title} loading="lazy" />
+                      <span className="card-badge">{categoryNames[article.category]}</span>
+                    </div>
+                    <div className="card-content">
+                      <h3 className="card-title">{article.title}</h3>
+                      <p className="card-excerpt">{article.excerpt}</p>
+                      <div className="card-meta">
+                        <div className="avatar">{article.author?.[0] || '編'}</div>
+                        <span className="author">{article.author}</span>
+                        <span>·</span>
+                        <span>{article.date}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : (
+          <div className="container" style={{ padding: '100px 20px', textAlign: 'center' }}>
+            <h2>尚無文章</h2>
+            <p>點擊上方「管理」按鈕發布第一篇文章！</p>
           </div>
-        </section>
+        )}
       </main>
 
       <footer>
@@ -196,14 +431,14 @@ function App() {
 
       {selectedArticle && (
         <>
-          <div className="modal-overlay" onClick={() => setSelectedArticle(null)}></div>
-          <div className="modal">
+          <div className="modal-overlay active" onClick={() => setSelectedArticle(null)}></div>
+          <div className="modal active">
             <button className="modal-close" onClick={() => setSelectedArticle(null)}>×</button>
             <img src={selectedArticle.image} alt="" className="modal-image" />
             <div className="modal-content">
               <h2 className="modal-title">{selectedArticle.title}</h2>
               <div className="modal-meta">
-                <div className="avatar">{selectedArticle.author[0]}</div>
+                <div className="avatar">{selectedArticle.author?.[0] || '編'}</div>
                 <div>
                   <div className="author">{selectedArticle.author}</div>
                   <div className="modal-date">{selectedArticle.date}</div>
@@ -213,6 +448,22 @@ function App() {
             </div>
           </div>
         </>
+      )}
+
+      {showAdmin === 'login' && (
+        <LoginModal 
+          onLogin={() => { setIsLoggedIn(true); setShowAdmin(true) }} 
+          onClose={() => setShowAdmin(false)} 
+        />
+      )}
+
+      {showAdmin === true && (
+        <AdminPanel 
+          onClose={() => setShowAdmin(false)} 
+          onRefresh={fetchArticles}
+          articles={articles}
+          setArticles={setArticles}
+        />
       )}
     </>
   )
