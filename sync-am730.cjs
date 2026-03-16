@@ -1,5 +1,5 @@
 // sync-am730.js
-// 使用 Playwright 從 am730 香港同步新聞 + Bing Image Search
+// 使用 Playwright 從 am730 香港同步新聞 + 完整內容
 const { chromium } = require('playwright');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
@@ -31,7 +31,7 @@ async function getBingImage(keyword) {
           urls.push(img.src);
         }
       });
-      return urls.slice(0, 3);
+      return urls.slice(0, 1);
     });
     
     const result = images[0] || null;
@@ -41,6 +41,47 @@ async function getBingImage(keyword) {
     return null;
   } finally {
     await browser.close();
+  }
+}
+
+async function getArticleContent(page, url) {
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+    
+    // Try to get article content
+    const content = await page.evaluate(() => {
+      // Try various selectors for article content
+      const selectors = [
+        '.article-content',
+        '.article-body', 
+        '.content',
+        '[class*="content"]',
+        'article',
+        '.post-content',
+        '.entry-content'
+      ];
+      
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el && el.innerText.length > 100) {
+          return el.innerText;
+        }
+      }
+      
+      // Fallback: get all paragraphs
+      const paras = Array.from(document.querySelectorAll('p'))
+        .map(p => p.innerText)
+        .filter(t => t.length > 20)
+        .join('\n\n');
+      
+      return paras || document.body.innerText.substring(0, 2000);
+    });
+    
+    return content;
+  } catch (e) {
+    console.log('Error getting content:', e.message);
+    return null;
   }
 }
 
@@ -75,8 +116,8 @@ async function articleExists(title) {
 async function createArticle(title, excerpt, content, imageUrl) {
   const date = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
   const body = JSON.stringify({
-    title, excerpt: excerpt || title,
-    content: `<p>${content}</p>`,
+    title, excerpt: excerpt || title.substring(0, 100),
+    content: content ? `<p>${content.replace(/\n/g, '</p><p>')}</p>` : `<p>${title}</p>`,
     category: 'business', author: 'am730', date, image: imageUrl
   });
   return fetch(`${SUPABASE_URL}/rest/v1/articles`, 'POST', body);
@@ -96,6 +137,7 @@ async function main() {
     });
     await page.waitForTimeout(8000);
     
+    // Get article links with URLs
     const articles = await page.evaluate(() => {
       const items = [];
       const allAnchors = document.querySelectorAll('a');
@@ -106,11 +148,11 @@ async function main() {
         
         if (text && text.length > 15 && href && href.includes('am730.com.hk') && 
             (href.includes('/article/') || href.includes('/column/'))) {
-          const img = anchor.querySelector('img')?.src;
-          items.push({ title: text, href, image: img });
+          items.push({ title: text, url: href });
         }
       });
       
+      // Dedupe
       const seen = new Set();
       const unique = [];
       for (const item of items) {
@@ -125,7 +167,7 @@ async function main() {
     
     let count = 0;
     for (const article of articles) {
-      if (count >= 15) break;
+      if (count >= 5) break; // Limit for testing
       
       const exists = await articleExists(article.title);
       if (exists) {
@@ -133,13 +175,16 @@ async function main() {
         continue;
       }
       
+      console.log('Getting content for:', article.title);
+      
+      // Get full article content
+      const content = await getArticleContent(page, article.url);
+      
       // Get relevant image from Bing
-      console.log('Searching Bing for:', article.title);
       const bingImage = await getBingImage(article.title);
       
-      const imageUrl = bingImage;
-      await createArticle(article.title, article.title, article.title, imageUrl);
-      console.log('Created:', article.title, bingImage ? '(with Bing image)' : '(no image)');
+      await createArticle(article.title, article.title, content || article.title, bingImage);
+      console.log('Created:', article.title, '| Content length:', content?.length || 0);
       count++;
     }
     
