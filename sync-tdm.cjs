@@ -1,12 +1,48 @@
 // sync-tdm.js
-// 使用 Playwright 從 TDM 澳廣視同步新聞
+// 使用 Playwright 從 TDM 澳廣視同步新聞 + Bing Image Search
 const { chromium } = require('playwright');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_';
-const DEFAULT_IMAGE = 'https://cdn.discordapp.com/attachments/1482661602204582019/1482981824048402462/MobileMacau_Tourist_Info_Hero_Banner.jpg?ex=69b8edf3&is=69b79c73&hm=e222a8a366f5b8a4632cb2a7f85c85455990fae57203da73eeb249474896f57d&';
 
 const https = require('https');
+
+const IMAGE_CACHE = {};
+
+async function getBingImage(keyword) {
+  if (IMAGE_CACHE[keyword]) return IMAGE_CACHE[keyword];
+  
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  
+  try {
+    const query = encodeURIComponent(keyword);
+    await page.goto(`https://www.bing.com/images/search?q=${query}`, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 15000 
+    });
+    await page.waitForTimeout(2000);
+    
+    const images = await page.evaluate(() => {
+      const imgs = document.querySelectorAll('.mimg');
+      const urls = [];
+      imgs.forEach(img => {
+        if (img.src && img.src.startsWith('http') && img.src.includes('bing.net')) {
+          urls.push(img.src);
+        }
+      });
+      return urls.slice(0, 1);
+    });
+    
+    const result = images[0] || null;
+    IMAGE_CACHE[keyword] = result;
+    return result;
+  } catch (e) {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
 
 function fetch(url, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
@@ -68,10 +104,7 @@ async function main() {
         const text = li.innerText?.trim();
         if (!text || text.length < 30) return;
         
-        // Must have date pattern for news
         if (!text.match(/\d{4}-\d{2}-\d{2}/)) return;
-        
-        // Skip navigation items
         if (text.includes('首頁') && text.length < 50) return;
         if (text.includes('電台') && text.length < 50) return;
         
@@ -116,11 +149,11 @@ async function main() {
         continue;
       }
       
-      const imageUrl = article.image && article.image.includes('cdn2.tdm.com.mo') 
-        ? article.image 
-        : null;
-      await createArticle(article.title, article.description, article.description || article.title, imageUrl);
-      console.log('Created:', article.title, imageUrl ? '(with image)' : '(no image)');
+      console.log('Searching Bing for:', article.title);
+      const bingImage = await getBingImage(article.title);
+      
+      await createArticle(article.title, article.description, article.description || article.title, bingImage);
+      console.log('Created:', article.title, bingImage ? '(with Bing image)' : '(no image)');
       count++;
     }
     

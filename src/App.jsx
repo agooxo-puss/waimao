@@ -17,13 +17,8 @@ const categoryNames = {
   macaodaily: "澳門"
 }
 
-const MACAU_IMAGE = 'https://picsum.photos/seed/macau/800/500'
-const DEFAULT_IMAGE = 'https://picsum.photos/seed/default/800/500'
-
 function getImage(article) {
   if (article.image) return article.image
-  
-  // No fallback - return empty to show placeholder
   return ''
 }
 
@@ -104,23 +99,6 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     }
   }
 
-  const checkAndFixImage = async (imgUrl, articleCategory) => {
-    if (!imgUrl) {
-      return CATEGORY_IMAGES[articleCategory] || DEFAULT_IMAGE;
-    }
-    
-    try {
-      const res = await fetch(imgUrl, { method: 'HEAD' });
-      if (!res.ok) {
-        return CATEGORY_IMAGES[articleCategory] || DEFAULT_IMAGE;
-      }
-    } catch {
-      return CATEGORY_IMAGES[articleCategory] || DEFAULT_IMAGE;
-    }
-    
-    return imgUrl;
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -128,9 +106,6 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
 
     const today = new Date()
     const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`
-
-    // Check and fix image if needed
-    const finalImage = await checkAndFixImage(image, category)
 
     try {
       const res = await fetch(`${supabaseUrl}/rest/v1/articles`, {
@@ -147,7 +122,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
           category,
           author: author || '歪貓編輯',
           date: dateStr,
-          image: finalImage || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
+          image: image || null
         })
       })
 
@@ -209,9 +184,6 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     setLoading(true)
     setMessage('')
 
-    // Check and fix image if needed
-    const finalImage = await checkAndFixImage(image, category)
-
     try {
       const res = await fetch(`${supabaseUrl}/rest/v1/articles?id=eq.${editingId}`, {
         method: 'PATCH',
@@ -226,7 +198,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
           content,
           category,
           author: author || '歪貓編輯',
-          image: finalImage || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
+          image: image || null
         })
       })
 
