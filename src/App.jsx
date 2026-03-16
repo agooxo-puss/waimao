@@ -23,9 +23,8 @@ const DEFAULT_IMAGE = 'https://picsum.photos/seed/default/800/500'
 function getImage(article) {
   if (article.image) return article.image
   
-  // Use title + category + id for unique seed
-  const seed = `${article.category}-${(article.title || '').substring(0, 10)}-${article.id}`
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/800/500`
+  // No fallback - return empty to show placeholder
+  return ''
 }
 
 function LoginModal({ onLogin, onClose }) {
