@@ -66,8 +66,10 @@ const CATEGORY_IMAGES = {
 
 function getImage(article) {
   if (article.image) return article.image
+  
   const images = CATEGORY_IMAGES[article.category] || CATEGORY_IMAGES.world
-  const index = article.id % images.length
+  const titleHash = (article.title || '').split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)
+  const index = Math.abs(titleHash) % images.length
   return images[index]
 }
 
