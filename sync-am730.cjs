@@ -1,12 +1,48 @@
 // sync-am730.js
-// 使用 Playwright 從 am730 香港同步新聞
+// 使用 Playwright 從 am730 香港同步新聞 + Bing Image Search
 const { chromium } = require('playwright');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_';
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop';
 
 const https = require('https');
+
+const IMAGE_CACHE = {};
+
+async function getBingImage(keyword) {
+  if (IMAGE_CACHE[keyword]) return IMAGE_CACHE[keyword];
+  
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  
+  try {
+    const query = encodeURIComponent(keyword);
+    await page.goto(`https://www.bing.com/images/search?q=${query}`, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 15000 
+    });
+    await page.waitForTimeout(2000);
+    
+    const images = await page.evaluate(() => {
+      const imgs = document.querySelectorAll('.mimg');
+      const urls = [];
+      imgs.forEach(img => {
+        if (img.src && img.src.startsWith('http') && img.src.includes('bing.net')) {
+          urls.push(img.src);
+        }
+      });
+      return urls.slice(0, 3);
+    });
+    
+    const result = images[0] || null;
+    IMAGE_CACHE[keyword] = result;
+    return result;
+  } catch (e) {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
 
 function fetch(url, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
@@ -75,7 +111,6 @@ async function main() {
         }
       });
       
-      // Dedupe
       const seen = new Set();
       const unique = [];
       for (const item of items) {
@@ -98,11 +133,13 @@ async function main() {
         continue;
       }
       
-      const imageUrl = article.image && (article.image.startsWith('http') || article.image.startsWith('//')) 
-        ? (article.image.startsWith('//') ? 'https:' + article.image : article.image)
-        : null;
+      // Get relevant image from Bing
+      console.log('Searching Bing for:', article.title);
+      const bingImage = await getBingImage(article.title);
+      
+      const imageUrl = bingImage;
       await createArticle(article.title, article.title, article.title, imageUrl);
-      console.log('Created:', article.title, imageUrl ? '(with image)' : '(no image)');
+      console.log('Created:', article.title, bingImage ? '(with Bing image)' : '(no image)');
       count++;
     }
     
