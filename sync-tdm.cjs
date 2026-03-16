@@ -1,5 +1,5 @@
 // sync-tdm.js
-// 使用 Playwright 從 TDM 澳廣視同步新聞 + Bing Image Search
+// 使用 Playwright 從 TDM 澳廣視同步新聞 + 完整內容
 const { chromium } = require('playwright');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
@@ -44,6 +44,35 @@ async function getBingImage(keyword) {
   }
 }
 
+async function getArticleContent(page, url) {
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+    
+    const content = await page.evaluate(() => {
+      const selectors = ['.article-content', '.article-body', '.content', '[class*="content"]', 'article', '.post-content', '.entry-content'];
+      
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el && el.innerText.length > 100) {
+          return el.innerText;
+        }
+      }
+      
+      const paras = Array.from(document.querySelectorAll('p'))
+        .map(p => p.innerText)
+        .filter(t => t.length > 20)
+        .join('\n\n');
+      
+      return paras || document.body.innerText.substring(0, 2000);
+    });
+    
+    return content;
+  } catch (e) {
+    return null;
+  }
+}
+
 function fetch(url, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
     const options = new URL(url);
@@ -75,8 +104,8 @@ async function articleExists(title) {
 async function createArticle(title, excerpt, content, imageUrl) {
   const date = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
   const body = JSON.stringify({
-    title, excerpt: excerpt || title,
-    content: `<p>${content}</p>`,
+    title, excerpt: excerpt || title.substring(0, 100),
+    content: content ? `<p>${content.replace(/\n/g, '</p><p>')}</p>` : `<p>${title}</p>`,
     category: 'macaodaily', author: '澳廣視', date, image: imageUrl
   });
   return fetch(`${SUPABASE_URL}/rest/v1/articles`, 'POST', body);
@@ -112,7 +141,6 @@ async function main() {
         if (lines.length < 2) return;
         
         let title = '';
-        let description = '';
         
         for (const line of lines) {
           if (line.match(/^\d{4}-\d{2}-\d{2}/)) continue;
@@ -121,16 +149,15 @@ async function main() {
           
           if (!title) {
             title = line;
-          } else {
-            description = line;
             break;
           }
         }
         
-        const img = li.querySelector('img')?.src;
+        // Try to get link
+        const link = li.querySelector('a')?.href;
         
-        if (title && title.length >= 10) {
-          items.push({ title, description: description || title, image: img });
+        if (title && title.length >= 10 && link) {
+          items.push({ title, url: link });
         }
       });
       
@@ -141,7 +168,7 @@ async function main() {
     
     let count = 0;
     for (const article of articles) {
-      if (count >= 15) break;
+      if (count >= 5) break;
       
       const exists = await articleExists(article.title);
       if (exists) {
@@ -149,11 +176,13 @@ async function main() {
         continue;
       }
       
-      console.log('Searching Bing for:', article.title);
+      console.log('Getting content for:', article.title);
+      const content = await getArticleContent(page, article.url);
+      
       const bingImage = await getBingImage(article.title);
       
-      await createArticle(article.title, article.description, article.description || article.title, bingImage);
-      console.log('Created:', article.title, bingImage ? '(with Bing image)' : '(no image)');
+      await createArticle(article.title, article.title, content || article.title, bingImage);
+      console.log('Created:', article.title, '| Content length:', content?.length || 0);
       count++;
     }
     

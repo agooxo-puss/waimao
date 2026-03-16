@@ -1,5 +1,5 @@
 // sync-bbc.cjs
-// 使用 Playwright 從 BBC 中文同步新聞 + Bing Image Search
+// 使用 Playwright 從 BBC 中文同步新聞 + 完整內容
 const { chromium } = require('playwright');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
@@ -31,7 +31,7 @@ async function getBingImage(keyword) {
           urls.push(img.src);
         }
       });
-      return urls.slice(0, 3);
+      return urls.slice(0, 1);
     });
     
     const result = images[0] || null;
@@ -41,6 +41,35 @@ async function getBingImage(keyword) {
     return null;
   } finally {
     await browser.close();
+  }
+}
+
+async function getArticleContent(page, url) {
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+    
+    const content = await page.evaluate(() => {
+      const selectors = ['article', '.article-content', '.article-body', '.content', '[class*="content"]', '.post-content', '.entry-content'];
+      
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el && el.innerText.length > 100) {
+          return el.innerText;
+        }
+      }
+      
+      const paras = Array.from(document.querySelectorAll('p'))
+        .map(p => p.innerText)
+        .filter(t => t.length > 20)
+        .join('\n\n');
+      
+      return paras || document.body.innerText.substring(0, 2000);
+    });
+    
+    return content;
+  } catch (e) {
+    return null;
   }
 }
 
@@ -75,8 +104,8 @@ async function articleExists(title) {
 async function createArticle(title, excerpt, content, imageUrl) {
   const date = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
   const body = JSON.stringify({
-    title, excerpt: excerpt || title,
-    content: `<p>${content}</p>`,
+    title, excerpt: excerpt || title.substring(0, 100),
+    content: content ? `<p>${content.replace(/\n/g, '</p><p>')}</p>` : `<p>${title}</p>`,
     category: 'world', author: 'BBC中文', date, image: imageUrl
   });
   return fetch(`${SUPABASE_URL}/rest/v1/articles`, 'POST', body);
@@ -107,8 +136,7 @@ async function main() {
         if (text && text.length > 20 && href && href.includes('bbc.com') && 
             (href.includes('/news/') || href.includes('/zhongwen/')) &&
             !href.includes('BBC')) {
-          const img = link.querySelector('img')?.src;
-          items.push({ title: text, href, image: img });
+          items.push({ title: text, url: href });
         }
       });
       
@@ -126,7 +154,7 @@ async function main() {
     
     let count = 0;
     for (const article of articles) {
-      if (count >= 15) break;
+      if (count >= 5) break;
       
       const exists = await articleExists(article.title);
       if (exists) {
@@ -134,13 +162,13 @@ async function main() {
         continue;
       }
       
-      // Get relevant image from Bing
-      console.log('Searching Bing for:', article.title);
+      console.log('Getting content for:', article.title);
+      const content = await getArticleContent(page, article.url);
+      
       const bingImage = await getBingImage(article.title);
       
-      const imageUrl = bingImage;
-      await createArticle(article.title, article.title, article.title, imageUrl);
-      console.log('Created:', article.title, bingImage ? '(with Bing image)' : '(no image)');
+      await createArticle(article.title, article.title, content || article.title, bingImage);
+      console.log('Created:', article.title, '| Content length:', content?.length || 0);
       count++;
     }
     

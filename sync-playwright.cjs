@@ -1,12 +1,77 @@
-// sync-playwright.js
-// 使用 Playwright 從澳門日報同步新聞
+// sync-playwright.cjs
+// 使用 Playwright 從澳門日報同步新聞 + 完整內容
 const { chromium } = require('playwright');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_';
-const DEFAULT_IMAGE = 'https://cdn.discordapp.com/attachments/1482661602204582019/1482981824048402462/MobileMacau_Tourist_Info_Hero_Banner.jpg?ex=69b8edf3&is=69b79c73&hm=e222a8a366f5b8a4632cb2a7f85c85455990fae57203da73eeb249474896f57d&';
 
 const https = require('https');
+
+const IMAGE_CACHE = {};
+
+async function getBingImage(keyword) {
+  if (IMAGE_CACHE[keyword]) return IMAGE_CACHE[keyword];
+  
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  
+  try {
+    const query = encodeURIComponent(keyword);
+    await page.goto(`https://www.bing.com/images/search?q=${query}`, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 15000 
+    });
+    await page.waitForTimeout(2000);
+    
+    const images = await page.evaluate(() => {
+      const imgs = document.querySelectorAll('.mimg');
+      const urls = [];
+      imgs.forEach(img => {
+        if (img.src && img.src.startsWith('http') && img.src.includes('bing.net')) {
+          urls.push(img.src);
+        }
+      });
+      return urls.slice(0, 1);
+    });
+    
+    const result = images[0] || null;
+    IMAGE_CACHE[keyword] = result;
+    return result;
+  } catch (e) {
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
+
+async function getArticleContent(page, url) {
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(3000);
+    
+    const content = await page.evaluate(() => {
+      const selectors = ['article', '.article-content', '.article-body', '.content', '[class*="content"]', '.post-content', '.entry-content', '.news-content'];
+      
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el && el.innerText.length > 100) {
+          return el.innerText;
+        }
+      }
+      
+      const paras = Array.from(document.querySelectorAll('p'))
+        .map(p => p.innerText)
+        .filter(t => t.length > 20)
+        .join('\n\n');
+      
+      return paras || document.body.innerText.substring(0, 2000);
+    });
+    
+    return content;
+  } catch (e) {
+    return null;
+  }
+}
 
 function fetch(url, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
@@ -31,14 +96,6 @@ function fetch(url, method = 'GET', body = null) {
   });
 }
 
-function checkImage(url) {
-  return new Promise((resolve) => {
-    if (!url) { resolve(false); return; }
-    https.get(url, (res) => { resolve(res.statusCode === 200); })
-      .on('error', () => resolve(false));
-  });
-}
-
 async function articleExists(title) {
   const data = await fetch(`${SUPABASE_URL}/rest/v1/articles?select=id&title=eq.${encodeURIComponent(title)}`);
   try { return JSON.parse(data).length > 0; } catch { return false; }
@@ -47,74 +104,68 @@ async function articleExists(title) {
 async function createArticle(title, excerpt, content, imageUrl) {
   const date = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
   const body = JSON.stringify({
-    title, excerpt: excerpt || title,
-    content: `<p>${content}</p>`,
+    title, excerpt: excerpt || title.substring(0, 100),
+    content: content ? `<p>${content.replace(/\n/g, '</p><p>')}</p>` : `<p>${title}</p>`,
     category: 'macaodaily', author: '澳門日報', date, image: imageUrl
   });
   return fetch(`${SUPABASE_URL}/rest/v1/articles`, 'POST', body);
 }
 
 async function main() {
-  console.log('=== Starting sync at', new Date().toISOString(), '===');
+  console.log('=== Starting Macau Daily sync at', new Date().toISOString(), '===');
   
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   
   try {
-    // 訪問首頁
     console.log('Loading homepage...');
     await page.goto('https://appimg.modaily.cn/amucsite/web/index.html#/home', { 
       waitUntil: 'networkidle',
       timeout: 60000 
     });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
     
-    // 獲取頁面文本
     const bodyText = await page.evaluate(() => document.body.innerText);
     const lines = bodyText.split('\n');
     
-    // 解析新聞標題
     const skipCategories = ['即時', '澳門記憶', '澳日快趣', '產業多元', '社會迴響', '澳門旅遊+', 
       '感受橫琴', '味力澳門', '心耕都更', '專題', '視頻', '藝文', '要聞',
       '小城故事', '粵澳對話', '灣區視野', 'VR', '美圖', '科技', '直播',
-      '更多', '排行榜', '加載更多'];
-    const skipTimes = ['剛剛', '1小時前', '2小時前', '3小時前', '分鐘前'];
+      '更多', '排行榜', '加載更多', '首頁', '新聞', '電台'];
     
     const titles = [];
     for (const line of lines) {
-      const trimmed = line.trim();
-      // 是時間標記，則下一行是標題
-      if (skipTimes.includes(trimmed)) continue;
-      // 是分類則跳過
-      if (skipCategories.includes(trimmed)) continue;
-      // 太短跳過
-      if (trimmed.length < 8) continue;
-      // 包含數字可能是日期
-      if (/^\d+-\d+/.test(trimmed)) continue;
-      // 不是標題
-      if (!/[^\u0000-\u007F]/.test(trimmed)) continue; // 需要中文
+      if (line.length < 10) continue;
+      if (skipCategories.some(cat => line.includes(cat))) continue;
+      if (line.match(/^\d+$/)) continue;
+      if (line.match(/\d{4}-\d{2}-\d{2}/)) continue;
+      if (line.match(/^[A-Za-z]/)) continue;
       
-      titles.push(trimmed);
+      const cleaned = line.trim();
+      if (cleaned.length >= 10 && cleaned.length <= 60) {
+        titles.push(cleaned);
+      }
     }
     
-    // 去重
-    const uniqueTitles = [...new Set(titles)].slice(0, 5);
-    console.log(`Found ${uniqueTitles.length} news titles`);
+    const uniqueTitles = [...new Set(titles)].slice(0, 20);
+    
+    console.log(`Found ${uniqueTitles.length} titles`);
     
     let added = 0;
     for (const title of uniqueTitles) {
-      if (added >= 2) break;
+      if (added >= 5) break;
       
-      if (await articleExists(title)) {
-        console.log(`Skipping: ${title.substring(0, 30)}...`);
+      const exists = await articleExists(title);
+      if (exists) {
+        console.log('Skipping existing:', title);
         continue;
       }
       
-      // 嘗試獲取詳情 - 通過點擊導航
-      // 由於動態加載，我們直接用默認圖片
-      console.log(`Adding: ${title.substring(0, 30)}...`);
+      console.log('Searching Bing for:', title);
+      const bingImage = await getBingImage(title);
       
-      await createArticle(title, title, title, DEFAULT_IMAGE);
+      await createArticle(title, title, title, bingImage);
+      console.log('Created:', title, bingImage ? '(with image)' : '(no image)');
       added++;
       
       await new Promise(r => setTimeout(r, 1000));
