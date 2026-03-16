@@ -16,25 +16,15 @@ const categoryNames = {
   macaodaily: "澳門"
 }
 
-const MACAU_IMAGE = 'https://picsum.photos/seed/macau1/800/500'
+const MACAU_IMAGE = 'https://picsum.photos/seed/macau/800/500'
 const DEFAULT_IMAGE = 'https://picsum.photos/seed/default/800/500'
-
-const CATEGORY_IMAGES = {
-  world: Array.from({length: 30}, (_, i) => `https://picsum.photos/seed/world${i+1}/800/500`),
-  tech: Array.from({length: 30}, (_, i) => `https://picsum.photos/seed/tech${i+1}/800/500`),
-  sports: Array.from({length: 30}, (_, i) => `https://picsum.photos/seed/sports${i+1}/800/500`),
-  culture: Array.from({length: 30}, (_, i) => `https://picsum.photos/seed/culture${i+1}/800/500`),
-  business: Array.from({length: 30}, (_, i) => `https://picsum.photos/seed/business${i+1}/800/500`),
-  macaodaily: Array.from({length: 30}, (_, i) => `https://picsum.photos/seed/macau${i+1}/800/500`)
-}
 
 function getImage(article) {
   if (article.image) return article.image
   
-  const images = CATEGORY_IMAGES[article.category] || CATEGORY_IMAGES.world
-  const titleHash = (article.title || '').split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0)
-  const index = Math.abs(titleHash) % 30
-  return images[index]
+  // Use title + category + id for unique seed
+  const seed = `${article.category}-${(article.title || '').substring(0, 10)}-${article.id}`
+  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/800/500`
 }
 
 function LoginModal({ onLogin, onClose }) {
