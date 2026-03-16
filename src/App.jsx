@@ -25,7 +25,7 @@ const CATEGORY_IMAGES = {
   sports: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800&h=500&fit=crop',
   culture: 'https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=800&h=500&fit=crop',
   business: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&h=500&fit=crop',
-  macaodaily: 'https://images.unsplash.com/photo-1566603582824-1366035c4b49?w=800&h=500&fit=crop'
+  macaodaily: 'https://images.unsplash.com/photo-1534113414509-0eec2bfb493f?w=800&h=500&fit=crop'
 }
 
 function getImage(article) {
