@@ -102,6 +102,28 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     }
   }
 
+  const checkAndFixImage = async (imgUrl, articleTitle) => {
+    if (!imgUrl) {
+      // Generate search URL from title
+      const keywords = articleTitle.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ').trim().split(' ').slice(0, 2).join(',');
+      return `https://source.unsplash.com/800x500/?${encodeURIComponent(keywords)}`;
+    }
+    
+    try {
+      const res = await fetch(imgUrl, { method: 'HEAD' });
+      if (!res.ok) {
+        // Image not accessible, generate search URL
+        const keywords = articleTitle.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ').trim().split(' ').slice(0, 2).join(',');
+        return `https://source.unsplash.com/800x500/?${encodeURIComponent(keywords)}`;
+      }
+    } catch {
+      const keywords = articleTitle.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ').trim().split(' ').slice(0, 2).join(',');
+      return `https://source.unsplash.com/800x500/?${encodeURIComponent(keywords)}`;
+    }
+    
+    return imgUrl;
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -109,6 +131,9 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
 
     const today = new Date()
     const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`
+
+    // Check and fix image if needed
+    const finalImage = await checkAndFixImage(image, title)
 
     try {
       const res = await fetch(`${supabaseUrl}/rest/v1/articles`, {
@@ -125,7 +150,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
           category,
           author: author || '歪貓編輯',
           date: dateStr,
-          image: image || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
+          image: finalImage || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
         })
       })
 
@@ -187,6 +212,9 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     setLoading(true)
     setMessage('')
 
+    // Check and fix image if needed
+    const finalImage = await checkAndFixImage(image, title)
+
     try {
       const res = await fetch(`${supabaseUrl}/rest/v1/articles?id=eq.${editingId}`, {
         method: 'PATCH',
@@ -201,7 +229,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
           content,
           category,
           author: author || '歪貓編輯',
-          image: image || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
+          image: finalImage || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
         })
       })
 
