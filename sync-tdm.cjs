@@ -118,9 +118,9 @@ async function main() {
       
       const imageUrl = article.image && article.image.includes('cdn2.tdm.com.mo') 
         ? article.image 
-        : DEFAULT_IMAGE;
+        : null;
       await createArticle(article.title, article.description, article.description || article.title, imageUrl);
-      console.log('Created:', article.title);
+      console.log('Created:', article.title, imageUrl ? '(with image)' : '(no image)');
       count++;
     }
     

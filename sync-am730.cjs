@@ -98,11 +98,11 @@ async function main() {
         continue;
       }
       
-      const imageUrl = article.image && article.image.startsWith('http') 
-        ? article.image 
-        : DEFAULT_IMAGE;
+      const imageUrl = article.image && (article.image.startsWith('http') || article.image.startsWith('//')) 
+        ? (article.image.startsWith('//') ? 'https:' + article.image : article.image)
+        : null;
       await createArticle(article.title, article.title, article.title, imageUrl);
-      console.log('Created:', article.title);
+      console.log('Created:', article.title, imageUrl ? '(with image)' : '(no image)');
       count++;
     }
     
