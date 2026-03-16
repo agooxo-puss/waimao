@@ -6,3 +6,5 @@ echo "=== Syncing TDM ==="
 /opt/homebrew/bin/node sync-tdm.cjs 2>&1
 echo "=== Syncing am730 ==="
 /opt/homebrew/bin/node sync-am730.cjs 2>&1
+echo "=== Syncing BBC ==="
+/opt/homebrew/bin/node sync-bbc.cjs 2>&1
