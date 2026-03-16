@@ -12,8 +12,17 @@ const categoryNames = {
   tech: "科技",
   sports: "體育",
   culture: "文化",
-  business: "商業",
-  macaodaily: "澳門日報"
+  business: "香港",
+  macaodaily: "澳門"
+}
+
+const MACAU_IMAGE = 'https://cdn.discordapp.com/attachments/1482661602204582019/1482981824048402462/MobileMacau_Tourist_Info_Hero_Banner.jpg?ex=69b8edf3&is=69b79c73&hm=e222a8a366f5b8a4632cb2a7f85c85455990fae57203da73eeb249474896f57d&'
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop'
+
+function getImage(article) {
+  if (article.image) return article.image
+  if (article.category === 'macaodaily') return MACAU_IMAGE
+  return DEFAULT_IMAGE
 }
 
 function LoginModal({ onLogin, onClose }) {
@@ -75,6 +84,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [activeTab, setActiveTab] = useState('publish')
+  const [editingId, setEditingId] = useState(null)
 
   const handleImageChange = (e) => {
     const file = e.target.files[0]
@@ -115,7 +125,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
           category,
           author: author || '歪貓編輯',
           date: dateStr,
-          image: image || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop'
+          image: image || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
         })
       })
 
@@ -160,6 +170,71 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
     }
   }
 
+  const handleEdit = (article) => {
+    setEditingId(article.id)
+    setTitle(article.title || '')
+    setExcerpt(article.excerpt || '')
+    setContent(article.content || '')
+    setCategory(article.category || 'world')
+    setAuthor(article.author || '')
+    setImage(article.image || '')
+    setImagePreview(article.image || null)
+    setActiveTab('publish')
+  }
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/articles?id=eq.${editingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({
+          title,
+          excerpt,
+          content,
+          category,
+          author: author || '歪貓編輯',
+          image: image || (category === 'macaodaily' ? MACAU_IMAGE : DEFAULT_IMAGE)
+        })
+      })
+
+      if (res.ok) {
+        setMessage('✅ 文章更新成功！')
+        setEditingId(null)
+        setTitle('')
+        setExcerpt('')
+        setContent('')
+        setAuthor('')
+        setImage('')
+        setImagePreview(null)
+        onRefresh()
+      } else {
+        setMessage('❌ 更新失敗')
+      }
+    } catch (err) {
+      setMessage('❌ 錯誤：' + err.message)
+    }
+
+    setLoading(false)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setTitle('')
+    setExcerpt('')
+    setContent('')
+    setAuthor('')
+    setImage('')
+    setImagePreview(null)
+  }
+
   return (
     <div className="admin-overlay">
       <div className="admin-panel">
@@ -184,7 +259,13 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
         </div>
 
         {activeTab === 'publish' && (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={editingId ? handleUpdate : handleSubmit}>
+            {editingId && (
+              <div className="edit-banner">
+                ✏️ 編輯文章中...
+                <button type="button" onClick={cancelEdit} className="cancel-edit">取消</button>
+              </div>
+            )}
             <div className="form-group">
               <label>標題 *</label>
               <input value={title} onChange={e => setTitle(e.target.value)} required placeholder="輸入文章標題" />
@@ -205,8 +286,8 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
                   <option value="tech">科技</option>
                   <option value="sports">體育</option>
                   <option value="culture">文化</option>
-                  <option value="business">商業</option>
-                  <option value="macaodaily">澳門日報</option>
+                  <option value="business">香港</option>
+                  <option value="macaodaily">澳門</option>
                 </select>
               </div>
               <div className="form-group">
@@ -225,7 +306,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
               )}
             </div>
             <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? '發布中...' : '🚀 發布文章'}
+              {loading ? (editingId ? '更新中...' : '發布中...') : (editingId ? '💾 更新文章' : '🚀 發布文章')}
             </button>
             {message && <p className="message">{message}</p>}
           </form>
@@ -239,12 +320,20 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
                   <span className="article-title">{article.title}</span>
                   <span className="article-meta">{article.author} · {article.date}</span>
                 </div>
-                <button 
-                  className="delete-btn"
-                  onClick={() => handleDelete(article.id)}
-                >
-                  🗑️ 刪除
-                </button>
+                <div className="article-actions">
+                  <button 
+                    className="edit-btn"
+                    onClick={() => handleEdit(article)}
+                  >
+                    ✏️ 編輯
+                  </button>
+                  <button 
+                    className="delete-btn"
+                    onClick={() => handleDelete(article.id)}
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -320,7 +409,7 @@ function App() {
         ) : articles.length > 0 ? (
           <>
             <section className="hero" onClick={() => setSelectedArticle(articles[0])}>
-              <img src={articles[0].image} alt="Featured" className="hero-image" />
+              <img src={getImage(articles[0])} alt="Featured" className="hero-image" />
               <div className="hero-overlay"></div>
               <div className="hero-content">
                 <span className="hero-badge">頭條</span>
@@ -370,13 +459,13 @@ function App() {
                   className={`category-tab ${category === "business" ? "active" : ""}`}
                   onClick={() => setCategory("business")}
                 >
-                  商業
+                  香港
                 </button>
                 <button 
                   className={`category-tab ${category === "macaodaily" ? "active" : ""}`}
                   onClick={() => setCategory("macaodaily")}
                 >
-                  澳門日報
+                  澳門
                 </button>
               </div>
             </section>
@@ -391,7 +480,7 @@ function App() {
                     onClick={() => setSelectedArticle(article)}
                   >
                     <div className="card-image">
-                      <img src={article.image} alt={article.title} loading="lazy" />
+                      <img src={getImage(article)} alt={article.title} loading="lazy" />
                       <span className="card-badge">{categoryNames[article.category]}</span>
                     </div>
                     <div className="card-content">

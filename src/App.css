@@ -732,6 +732,52 @@ footer {
   background: #dd2222;
 }
 
+.edit-btn {
+  background: #4a90d9;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.edit-btn:hover {
+  background: #357abd;
+}
+
+.article-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-banner {
+  background: #fff3cd;
+  color: #856404;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cancel-edit {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.cancel-edit:hover {
+  background: #5a6268;
+}
+
 /* File Input */
 .file-input {
   width: 100%;

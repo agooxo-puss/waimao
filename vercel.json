@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/api/:match*", "destination": "/api/:match" }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}
