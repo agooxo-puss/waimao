@@ -301,21 +301,23 @@ async def sync_bbc():
     print("✅ BBC sync complete!")
 
 async def sync_tvbs():
-    """Sync Taiwan news from setn.com (東森新聞)"""
-    print("📺 Syncing Taiwan news (東森新聞)...")
+    """Sync Taiwan news from setn.com (三立新聞/東森新聞)"""
+    print("📺 Syncing Taiwan news (三立新聞)...")
     
     async with Browser(headless=True) as b:
-        # Setn (東森新聞) - easier to scrape
-        await b.goto("https://www.setn.com/ViewAll.aspx")
+        # Setn (三立新聞) - main page
+        await b.goto("https://www.setn.com")
         await b.wait(3000)
         
         html = await b.content()
         
         import re
         
-        # Find news links
-        links = re.findall(r'href="(https?://www\.setn\.com/[^\"]+)"', html)
-        links = list(set([l for l in links if 'news' in l.lower() and 'article' in l.lower()]))[:15]
+        # Find news links - handle HTML entities
+        links = re.findall(r'href="(https?://www\.setn\.com/[^"]+)"', html)
+        # Clean HTML entities
+        links = [l.replace('&amp;', '&') for l in links]
+        links = list(set([l for l in links if ('news' in l.lower() or 'viewall' in l.lower()) and 'category' not in l.lower()]))[:15]
         
         print(f"  Found {len(links)} potential articles")
         
@@ -370,7 +372,7 @@ async def sync_tvbs():
                 elif any(x in link_lower for x in ['sport', 'nba', '足球', '籃球']):
                     category = "sports"
                 
-                if save_article(title, excerpt, content, category, "東森新聞", image):
+                if save_article(title, excerpt, content, category, "三立新聞", image):
                     print(f"  ✅ Saved: {title[:40]}...")
                 else:
                     print(f"  ❌ Failed: {title[:40]}...")
