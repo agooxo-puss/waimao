@@ -392,12 +392,12 @@ async def sync_tvbs():
     print("✅ Taiwan news sync complete!")
 
 async def sync_ftv():
-    """Sync Taiwan news from FTV (民視新聞)"""
-    print("📺 Syncing FTV (民視新聞)...")
+    """Sync Taiwan news from Taiwan Hot (最受歡迎)"""
+    print("📺 Syncing Taiwan Hot (最受歡迎)...")
     
     async with Browser(headless=True) as b:
-        # FTV main news page
-        await b.goto("https://www.ftvnews.com.tw/")
+        # Try Taiwan Hot page - often has most popular news
+        await b.goto("https://www.ttv.com.tw/news/hot/")
         await b.wait(5000)
         
         html = await b.content()
@@ -405,10 +405,9 @@ async def sync_ftv():
         import re
         
         # Find news links
-        links = re.findall(r'href="(https?://[^\"]+ftvnews[^\"]+)"', html, re.IGNORECASE)
-        links = [l.replace('&amp;', '&') for l in links]
-        # Filter for actual news articles
-        links = list(set([l for l in links if ('news' in l.lower() or 'A' in l) and 'category' not in l.lower() and 'tag' not in l.lower() and 'video' not in l.lower()]))[:10]
+        links = re.findall(r'href="(https?://[^\"]+)"', html)
+        # Filter for ttv news
+        links = [l for l in links if 'ttv' in l.lower() and 'news' in l.lower()][:10]
         
         print(f"  Found {len(links)} potential articles")
         
@@ -471,7 +470,7 @@ async def sync_ftv():
                 elif any(x in link_lower for x in ['tech', '3c', 'digital']):
                     category = "tech"
                 
-                if save_article(title, excerpt, content, category, "民視新聞", image):
+                if save_article(title, excerpt, content, category, "台灣熱門", image):
                     print(f"  ✅ Saved: {title[:40]}...")
                 else:
                     print(f"  ❌ Failed: {title[:40]}...")
@@ -480,7 +479,7 @@ async def sync_ftv():
                 print(f"  ❌ Error: {e}")
                 continue
     
-    print("✅ FTV sync complete!")
+    print("✅ Taiwan Hot sync complete!")
 
 async def sync_all():
     """Sync all sources"""
