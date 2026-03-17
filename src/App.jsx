@@ -394,6 +394,12 @@ function HomePage() {
     setDisplayCount(12)
   }, [currentCategory])
 
+  const filteredArticles = currentCategory === "all" 
+    ? articles 
+    : articles.filter(a => a.category === currentCategory)
+  
+  const displayedArticles = filteredArticles.slice(0, displayCount)
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
@@ -413,12 +419,6 @@ function HomePage() {
       setShowAdmin('login')
     }
   }
-
-  const filteredArticles = currentCategory === "all" 
-    ? articles 
-    : articles.filter(a => a.category === currentCategory)
-  
-  const displayedArticles = filteredArticles.slice(0, displayCount)
 
   const selectCategory = (cat) => {
     setCurrentCategory(cat)
