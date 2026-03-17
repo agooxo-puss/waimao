@@ -301,13 +301,13 @@ async def sync_bbc():
     print("✅ BBC sync complete!")
 
 async def sync_tvbs():
-    """Sync Taiwan news from setn.com (三立新聞/東森新聞)"""
+    """Sync Taiwan news from setn.com (三立新聞)"""
     print("📺 Syncing Taiwan news (三立新聞)...")
     
     async with Browser(headless=True) as b:
         # Setn (三立新聞) - main page
         await b.goto("https://www.setn.com")
-        await b.wait(3000)
+        await b.wait(5000)  # Wait longer for dynamic content
         
         html = await b.content()
         
@@ -317,21 +317,33 @@ async def sync_tvbs():
         links = re.findall(r'href="(https?://www\.setn\.com/[^"]+)"', html)
         # Clean HTML entities
         links = [l.replace('&amp;', '&') for l in links]
-        links = list(set([l for l in links if ('news' in l.lower() or 'viewall' in l.lower()) and 'category' not in l.lower()]))[:15]
+        links = list(set([l for l in links if ('news' in l.lower() or 'viewall' in l.lower() or 'article' in l.lower()) and 'category' not in l.lower() and 'tag' not in l.lower()]))[:10]
         
         print(f"  Found {len(links)} potential articles")
         
         for i, link in enumerate(links):
             try:
                 await b.goto(link)
-                await b.wait(2000)
+                await b.wait(3000)  # Wait for article to load
                 
-                # Get title
-                title = await b.eval("document.querySelector('h1')?.textContent") or ""
-                if not title:
-                    title = await b.eval("document.querySelector('[class*=\"title\"]')?.textContent") or ""
+                # Get title - try multiple selectors
+                title = ""
+                selectors = [
+                    "h1",
+                    "[class*='title']",
+                    ".article-title",
+                    ".news-title",
+                    "[itemprop='headline']",
+                    "title"
+                ]
+                for sel in selectors:
+                    title = await b.eval(f"document.querySelector('{sel}')?.textContent") or ""
+                    if title and len(title) > 5:
+                        break
                 
+                title = title.strip()
                 if not title or len(title) < 5:
+                    print(f"  ⏭️  Skip (no title): {link[:50]}...")
                     continue
                 
                 # Check if exists
@@ -341,20 +353,22 @@ async def sync_tvbs():
                 
                 # Get content
                 content = await b.eval("""
-                    document.querySelector('[class*=\"content\"]')?.innerHTML ||
-                    document.querySelector('article')?.innerHTML || ''
+                    document.querySelector('[class*="content"]')?.innerHTML ||
+                    document.querySelector('article')?.innerHTML ||
+                    document.querySelector('.article-detail')?.innerHTML || ''
                 """) or ""
                 content = clean_html(content)
                 
                 # Get image
                 image = await b.eval("""
-                    document.querySelector('meta[property=\"og:image\"]')?.content ||
-                    document.querySelector('[class*=\"img\"] img')?.src || ''
+                    document.querySelector('meta[property="og:image"]')?.content ||
+                    document.querySelector('[class*="img"] img')?.src || ''
                 """) or ""
                 
                 # Get excerpt
                 excerpt = await b.eval("""
-                    document.querySelector('meta[name=\"description\"]')?.content || ''
+                    document.querySelector('meta[name="description"]')?.content ||
+                    document.querySelector('meta[property="og:description"]')?.content || ''
                 """) or ""
                 
                 if not excerpt and content:
