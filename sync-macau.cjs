@@ -5,7 +5,6 @@ const { URL } = require('url');
 
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_';
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop';
 
 function fetchText(url) {
   return new Promise((resolve, reject) => {
@@ -119,7 +118,7 @@ async function main() {
       const detail = await getNewsDetail(item.href);
       if (!detail.title || !detail.content) continue;
       
-      let finalImage = DEFAULT_IMAGE;
+      let finalImage = null;
       if (detail.imageUrl) {
         const isValid = await checkImage(detail.imageUrl);
         if (isValid) finalImage = detail.imageUrl;

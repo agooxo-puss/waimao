@@ -8,9 +8,6 @@ const { URL } = require('url');
 const SUPABASE_URL = 'https://sjokgfqpyuzrhuvrnvcz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_';
 
-// Default fallback image (used when source image is broken)
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=500&fit=crop';
-
 // Helper function to make a GET request and return the response body as text
 function fetchText(url) {
   return new Promise((resolve, reject) => {
@@ -220,17 +217,16 @@ async function main() {
           continue;
         }
         
-        // Check if image is valid, use default if broken
-        let finalImageUrl = detail.imageUrl;
+        // Check if image is valid, use null if not found
+        let finalImageUrl = detail.imageUrl || null;
         if (detail.imageUrl) {
           const isImageValid = await checkImageUrl(detail.imageUrl);
           if (!isImageValid) {
-            console.log(`Source image is broken (404), using default image`);
-            finalImageUrl = DEFAULT_IMAGE;
+            console.log(`Source image is broken (404), setting to null`);
+            finalImageUrl = null;
           }
         } else {
-          console.log(`No image found, using default image`);
-          finalImageUrl = DEFAULT_IMAGE;
+          console.log(`No image found, setting to null`);
         }
         
         console.log(`Creating article: "${item.title.substring(0, 50)}..."`);
