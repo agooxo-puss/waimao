@@ -394,6 +394,18 @@ function HomePage() {
     setDisplayCount(12)
   }, [currentCategory])
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        if (displayedArticles.length < filteredArticles.length) {
+          setDisplayCount(prev => prev + 12)
+        }
+      }
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [displayedArticles.length, filteredArticles.length])
+
   const handleAdminClick = () => {
     if (isLoggedIn) {
       setShowAdmin(true)
@@ -405,12 +417,8 @@ function HomePage() {
   const filteredArticles = currentCategory === "all" 
     ? articles 
     : articles.filter(a => a.category === currentCategory)
-
+  
   const displayedArticles = filteredArticles.slice(0, displayCount)
-
-  const loadMore = () => {
-    setDisplayCount(prev => prev + 12)
-  }
 
   const selectCategory = (cat) => {
     setCurrentCategory(cat)
@@ -535,14 +543,6 @@ function HomePage() {
                   </article>
                 ))}
               </div>
-              
-              {displayedArticles.length < filteredArticles.length && (
-                <div className="load-more-container">
-                  <button className="load-more-btn" onClick={loadMore}>
-                    載入更多 ({filteredArticles.length - displayedArticles.length} 篇)
-                  </button>
-                </div>
-              )}
             </section>
           </>
         ) : (
