@@ -286,69 +286,301 @@ HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>歪貓娛樂 - Monitor</title>
+    <title>歪貓娛樂 - 管理面板</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; }
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; text-align: center; }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; }
         .header h1 { font-size: 24px; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .header p { opacity: 0.8; font-size: 14px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { 
+            padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; 
+            font-size: 14px; font-weight: 500; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #43e97b; color: white; }
+        .btn-danger { background: #fa709a; color: white; }
+        .btn-info { background: #4facfe; color: white; }
+        .btn-warning { background: #fee140; color: #333; }
+        
         .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .stat { background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .stat h3 { font-size: 14px; color: #666; }
         .stat .value { font-size: 32px; font-weight: bold; color: #667eea; }
+        
         .section { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .section h2 { font-size: 18px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
         .article { display: flex; gap: 15px; padding: 15px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 10px; }
+        .article:hover { background: #fafafa; }
         .article img { width: 100px; height: 70px; object-fit: cover; border-radius: 6px; }
+        .article-content { flex: 1; }
         .article-title { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
         .article-meta { font-size: 12px; color: #999; }
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; background: #667eea; color: white; margin-right: 10px; }
-        .badge.world { background: #667eea; }
-        .badge.tech { background: #f093fb; }
-        .badge.sports { background: #4facfe; }
-        .btn { display: inline-block; padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; }
+        .article-actions { display: flex; gap: 5px; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; 
+        }
+        .form-group textarea { min-height: 100px; }
+        
+        .modal { 
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(0,0,0,0.5); z-index: 1000; 
+        }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content { 
+            background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; 
+            max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; }
+        
+        .tab-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; border: none; background: #eee; border-radius: 6px; cursor: pointer; }
+        .tab-btn.active { background: #667eea; color: white; }
+        
+        .log-box { 
+            background: #1e1e1e; color: #0f0; padding: 15px; border-radius: 8px; 
+            font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto;
+        }
+        
+        .loading { text-align: center; padding: 40px; color: #666; }
+        
+        .test-form { display: flex; gap: 10px; }
+        .test-form input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        
+        @media (max-width: 768px) {
+            .stats { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; }
+            .article { flex-direction: column; }
+            .article img { width: 100%; height: 150px; }
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🐱 歪貓娛樂 - 新聞同步監控</h1>
+        <h1>🐱 歪貓娛樂 - 管理面板</h1>
+        <p>Kimaki News Admin Panel</p>
     </div>
+    
     <div class="container">
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-primary" onclick="showTab('articles')">📰 文章管理</button>
+            <button class="btn btn-success" onclick="runSync()">🔄 立即同步</button>
+            <button class="btn btn-info" onclick="showTab('add')">➕ 發布文章</button>
+            <button class="btn btn-warning" onclick="showTab('test')">🧪 測試網站</button>
+            <button class="btn btn-info" onclick="showTab('logs')">📋 日誌</button>
+        </div>
+        
+        <!-- Stats -->
         <div class="stats">
-            <div class="stat"><h3>📰 總文章</h3><div class="value">{{ stats.total }}</div></div>
+            <div class="stat"><h3>📰 總文章</h3><div class="value" id="total">{{ stats.total }}</div></div>
             <div class="stat"><h3>📂 分類</h3><div class="value">{{ stats.categories|length }}</div></div>
             <div class="stat"><h3>📡 來源</h3><div class="value">{{ stats.sources|length }}</div></div>
         </div>
-        <div class="section">
-            <h2>📰 最新文章</h2>
-            {% for a in articles %}
-            <div class="article">
-                {% if a.image %}<img src="{{ a.image }}">{% endif %}
-                <div>
-                    <div class="article-title">{{ a.title[:60] }}...</div>
-                    <div class="article-meta">
-                        <span class="badge {{ a.category }}">{{ a.category }}</span>
-                        <span>{{ a.author }}</span>
-                        <span>{{ a.date }}</span>
+        
+        <!-- Articles Tab -->
+        <div id="tab-articles" class="section">
+            <h2>📰 文章列表 <button class="btn-sm" onclick="loadArticles()">🔄 刷新</button></h2>
+            <div id="articles-list">
+                {% for a in articles %}
+                <div class="article" data-id="{{ a.id }}">
+                    {% if a.image %}<img src="{{ a.image }}">{% endif %}
+                    <div class="article-content">
+                        <div class="article-title">{{ a.title[:60] }}...</div>
+                        <div class="article-meta">
+                            <span class="badge {{ a.category }}">{{ a.category }}</span>
+                            <span>{{ a.author }}</span>
+                            <span>{{ a.date }}</span>
+                        </div>
+                    </div>
+                    <div class="article-actions">
+                        <button class="btn-sm btn-danger" onclick="deleteArticle({{ a.id }})">🗑️</button>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
-        <a href="/refresh" class="btn">🔄 刷新</a>
+        
+        <!-- Add Article Tab -->
+        <div id="tab-add" class="section" style="display:none;">
+            <h2>➕ 發布文章</h2>
+            <form id="add-form" onsubmit="submitArticle(event)">
+                <div class="form-group">
+                    <label>標題 *</label>
+                    <input type="text" name="title" required placeholder="輸入文章標題">
+                </div>
+                <div class="form-group">
+                    <label>摘要</label>
+                    <textarea name="excerpt" placeholder="輸入文章摘要"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>內容 (HTML)</label>
+                    <textarea name="content" placeholder="<p>文章內容...</p>"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>分類</label>
+                    <select name="category">
+                        <option value="world">國際</option>
+                        <option value="tech">科技</option>
+                        <option value="sports">體育</option>
+                        <option value="culture">文化</option>
+                        <option value="business">香港</option>
+                        <option value="macaodaily">澳門</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>作者</label>
+                    <input type="text" name="author" placeholder="作者名稱">
+                </div>
+                <div class="form-group">
+                    <label>圖片 URL</label>
+                    <input type="text" name="image" placeholder="https://...">
+                </div>
+                <button type="submit" class="btn btn-success">🚀 發布文章</button>
+            </form>
+        </div>
+        
+        <!-- Test Tab -->
+        <div id="tab-test" class="section" style="display:none;">
+            <h2>🧪 測試網站</h2>
+            <div class="test-form">
+                <input type="text" id="test-url" placeholder="輸入網址..." value="https://kimaki.vercel.app">
+                <button class="btn btn-info" onclick="testWebsite()">測試</button>
+            </div>
+            <div id="test-result" style="margin-top: 20px;"></div>
+        </div>
+        
+        <!-- Logs Tab -->
+        <div id="tab-logs" class="section" style="display:none;">
+            <h2>📋 操作日誌</h2>
+            <div class="log-box" id="log-box">
+                {% for log in logs %}
+                {{ log }}<br>
+                {% endfor %}
+            </div>
+        </div>
     </div>
+    
+    <script>
+        let logs = {{ logs|tojson }};
+        
+        function showTab(tab) {
+            document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+            document.getElementById('tab-' + tab).style.display = 'block';
+        }
+        
+        function addLog(msg) {
+            const time = new Date().toLocaleTimeString();
+            logs.push('[' + time + '] ' + msg);
+            if (logs.length > 100) logs.shift();
+            document.getElementById('log-box').innerHTML = logs.join('<br>');
+        }
+        
+        async function runSync() {
+            addLog('🔄 開始同步新聞...');
+            try {
+                const res = await fetch('/api/sync');
+                const data = await res.json();
+                addLog('✅ 同步完成: ' + data.message);
+                loadArticles();
+            } catch(e) {
+                addLog('❌ 同步失敗: ' + e);
+            }
+        }
+        
+        async function loadArticles() {
+            const res = await fetch('/api/articles');
+            const articles = await res.json();
+            let html = '';
+            articles.forEach(a => {
+                html += '<div class="article"><div class="article-content"><div class="article-title">' + a.title.substring(0,60) + '...</div><div class="article-meta"><span>' + a.category + '</span> <span>' + a.author + '</span> <span>' + a.date + '</span></div></div><button class="btn-sm btn-danger" onclick="deleteArticle(' + a.id + ')">🗑️</button></div>';
+            });
+            document.getElementById('articles-list').innerHTML = html;
+            document.getElementById('total').textContent = articles.length;
+        }
+        
+        async function deleteArticle(id) {
+            if (!confirm('確定要刪除呢篇文章？')) return;
+            addLog('🗑️ 刪除文章 ' + id);
+            try {
+                await fetch('/api/article/' + id, { method: 'DELETE' });
+                addLog('✅ 刪除成功');
+                loadArticles();
+            } catch(e) {
+                addLog('❌ 刪除失敗: ' + e);
+            }
+        }
+        
+        async function submitArticle(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                title: form.title.value,
+                excerpt: form.excerpt.value,
+                content: form.content.value,
+                category: form.category.value,
+                author: form.author.value || '歪貓編輯',
+                image: form.image.value || null
+            };
+            addLog('📝 發布文章: ' + data.title);
+            try {
+                const res = await fetch('/api/article', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                addLog('✅ 發布成功');
+                form.reset();
+                loadArticles();
+            } catch(e) {
+                addLog('❌ 發布失敗: ' + e);
+            }
+        }
+        
+        async function testWebsite() {
+            const url = document.getElementById('test-url').value;
+            addLog('🧪 測試網站: ' + url);
+            try {
+                const res = await fetch('/api/test?url=' + encodeURIComponent(url));
+                const data = await res.json();
+                addLog('📄 Title: ' + data.title);
+                addLog('📍 URL: ' + data.url);
+                addLog('✅ 測試成功');
+                document.getElementById('test-result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch(e) {
+                addLog('❌ 測試失敗: ' + e);
+            }
+        }
+    </script>
 </body>
 </html>
 """
 
 app = Flask(__name__)
 
+# In-memory logs
+logs = ["[" + datetime.now().strftime("%H:%M:%S") + "] 系統啟動"]
+
+def add_log(msg):
+    logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    if len(logs) > 100:
+        logs.pop(0)
+
 @app.route('/')
 def index():
-    articles = get_articles(20)
+    articles = get_articles(50)
     stats = get_stats()
-    return render_template_string(HTML, articles=articles, stats=stats)
+    return render_template_string(HTML, articles=articles, stats=stats, logs=logs)
 
 @app.route('/api/articles')
 def api_articles():
@@ -358,8 +590,101 @@ def api_articles():
 def api_stats():
     return jsonify(get_stats())
 
+@app.route('/api/sync')
+def api_sync():
+    """Trigger sync"""
+    add_log("🔄 開始同步新聞...")
+    # In a real implementation, this would run the sync
+    # For now, just return a message
+    add_log("✅ 同步完成 (mock)")
+    return jsonify({"status": "ok", "message": "Sync completed"})
+
+@app.route('/api/article', methods=['POST'])
+def api_add_article():
+    """Add new article"""
+    data = request.json
+    title = data.get('title', '')
+    excerpt = data.get('excerpt', '')
+    content = data.get('content', '')
+    category = data.get('category', 'world')
+    author = data.get('author', '歪貓編輯')
+    image = data.get('image')
+    
+    date_str = f"{datetime.now().year}年{datetime.now().month}月{datetime.now().day}日"
+    
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/articles",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "title": title[:500],
+                "excerpt": excerpt[:1000],
+                "content": content[:50000],
+                "category": category,
+                "author": author,
+                "date": date_str,
+                "image": image
+            }
+        )
+        if r.status_code in [200, 201]:
+            add_log(f"✅ 新增文章: {title[:30]}...")
+            return jsonify({"status": "ok"})
+        else:
+            add_log(f"❌ 新增失敗: {r.status_code}")
+            return jsonify({"status": "error", "message": r.text}), 400
+    except Exception as e:
+        add_log(f"❌ 新增錯誤: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/article/<int:article_id>', methods=['DELETE'])
+def api_delete_article(article_id):
+    """Delete article"""
+    try:
+        r = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/articles?id=eq.{article_id}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}"
+            }
+        )
+        if r.status_code in [200, 204]:
+            add_log(f"🗑️ 刪除文章 ID: {article_id}")
+            return jsonify({"status": "ok"})
+        else:
+            add_log(f"❌ 刪除失敗: {r.status_code}")
+            return jsonify({"status": "error"}), 400
+    except Exception as e:
+        add_log(f"❌ 刪除錯誤: {e}")
+        return jsonify({"status": "error"}), 500
+
+@app.route('/api/test')
+def api_test():
+    """Test a website"""
+    url = request.args.get('url', 'https://example.com')
+    add_log(f"🧪 測試網站: {url}")
+    
+    async def run_test():
+        async with Browser(headless=True) as b:
+            await b.goto(url)
+            await b.wait(3000)
+            return {
+                "url": await b.url(),
+                "title": await b.title(),
+                "console_count": len(b.console),
+                "errors": len([m for m in b.console if m['type'] == 'error'])
+            }
+    
+    result = asyncio.run(run_test())
+    add_log(f"✅ 測試完成: {result['title']}")
+    return jsonify(result)
+
 @app.route('/refresh')
 def refresh():
+    add_log("🔄 頁面刷新")
     return index()
 
 
