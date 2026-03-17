@@ -168,7 +168,7 @@ def cleanup_duplicates():
     try:
         # Get all articles ordered by created_at
         r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/articles?select=id,title,created_at&order=created_at.desc",
+            f"{SUPABASE_URL}/rest/v1/articles?select=id,title,author,created_at&order=created_at.desc",
             headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
         )
         if r.status_code != 200:
@@ -176,12 +176,13 @@ def cleanup_duplicates():
             return 0
         
         articles = r.json()
+        
+        # First: Remove exact duplicate titles (same title = delete older)
         seen_titles = {}
         delete_ids = []
         
-        # Find duplicates - keep newest
         for a in articles:
-            title = a.get('title', '')
+            title = a.get('title', '').strip()
             if not title:
                 continue
             if title in seen_titles:
@@ -189,6 +190,21 @@ def cleanup_duplicates():
                 delete_ids.append(a['id'])
             else:
                 seen_titles[title] = a['id']
+        
+        # Second: Also check for articles with same content from different sources
+        # (keep the newest, delete others)
+        content_map = {}
+        for a in articles:
+            if a['id'] in delete_ids:
+                continue
+            content = a.get('content', '')[:500] if a.get('content') else ''
+            # Skip if content is just the age warning
+            if '限制級您即將進入之新聞內容' in content or len(content) < 100:
+                continue
+            if content in content_map:
+                delete_ids.append(a['id'])
+            else:
+                content_map[content] = a['id']
         
         # Delete duplicates
         deleted = 0
@@ -217,7 +233,7 @@ def repair_articles():
     repaired = 0
     
     try:
-        # Get articles that need repair (no image, no content, or no url)
+        # Get articles that need repair (no image, no content, or just age warning)
         r = requests.get(
             f"{SUPABASE_URL}/rest/v1/articles?select=*&order=created_at.desc&limit=100",
             headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
@@ -225,6 +241,132 @@ def repair_articles():
         if r.status_code != 200:
             print("  ❌ Failed to fetch articles")
             return 0
+        
+        articles = r.json()
+        
+        for a in articles:
+            needs_update = False
+            update_data = {}
+            aid = a.get('id')
+            title = a.get('title', '')
+            content = a.get('content', '')
+            image = a.get('image')
+            
+            # Check if content is only the age warning or too short
+            has_bad_content = (
+                not content or 
+                len(content) < 100 or 
+                '限制級您即將進入之新聞內容' in content[:200] or
+                '我已年滿18歲進入根據' in content[:200]
+            )
+            
+            # Check if image is missing or invalid
+            needs_image = not image or image == 'None' or image == ''
+            
+            # Need to repair either content or image
+            if needs_image or has_bad_content:
+                print(f"  🔍 Article {aid}: Needs repair...")
+                
+                # Try to find the article URL based on source
+                source = a.get('author', '')
+                url = a.get('url', '')
+                
+                # If no URL, try to search for the article
+                if not url or url == '':
+                    try:
+                        # Try multiple search approaches
+                        search_queries = [
+                            f"https://www.bing.com/search?q={requests.utils.quote(title + ' site:ltn.com.tw')}",
+                            f"https://www.bing.com/search?q={requests.utils.quote(title)}",
+                        ]
+                        for search_url in search_queries:
+                            search_resp = requests.get(search_url, headers=headers, timeout=10)
+                            # Find news.ltn.com.tw links
+                            ltn_match = re.search(r'https://news\.ltn\.com\.tw/[a-z]+/[^"\s]+', search_resp.text)
+                            if ltn_match:
+                                url = ltn_match.group(0)
+                                update_data['url'] = url
+                                needs_update = True
+                                break
+                    except:
+                        pass
+                
+                # If we have URL, try to get image and content
+                if url:
+                    try:
+                        resp = requests.get(url, headers=headers, timeout=10)
+                        resp.encoding = 'utf-8'
+                        html = resp.text
+                        
+                        # Get image if needed
+                        if needs_image:
+                            og_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html)
+                            if not og_match:
+                                og_match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html)
+                            if og_match:
+                                image = og_match.group(1)
+                                update_data['image'] = image
+                                needs_update = True
+                                print(f"    ✅ Found image")
+                        
+                        # Get content if needed
+                        if has_bad_content:
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(html, 'lxml')
+                            article_elem = (
+                                soup.find('article') or 
+                                soup.find(class_='content940') or
+                                soup.find(class_=re.compile('content', re.I))
+                            )
+                            if article_elem:
+                                content_text = article_elem.get_text(strip=True)
+                                content_text = re.sub(r'限制級您即將進入之新聞內容需滿18歲.*?我同意', '', content_text)
+                                content_text = re.sub(r'我已年滿18歲進入根據.*?網站分級', '', content_text)
+                                content_text = re.sub(r'首頁>.*?>', '', content_text)
+                                content_text = content_text.strip()
+                                if content_text and len(content_text) > 50:
+                                    update_data['content'] = content_text[:50000]
+                                    needs_update = True
+                                    print(f"    ✅ Fixed content: {len(content_text)} chars")
+                    except Exception as e:
+                        print(f"    ❌ Error: {e}")
+                
+                # Last resort: use Bing Image Search for image
+                if needs_update and 'image' not in update_data:
+                    try:
+                        search_url = f"https://www.bing.com/images/search?q={requests.utils.quote(title)}&first=1"
+                        search_resp = requests.get(search_url, headers=headers, timeout=10)
+                        bing_match = re.search(r'mediaurl=([^&"]+)', search_resp.text)
+                        if bing_match:
+                            img = requests.utils.unquote(bing_match.group(1))
+                            update_data['image'] = img
+                            print(f"    ✅ Bing fallback image")
+                    except:
+                        pass
+            
+            # Update if needed
+            if needs_update and update_data:
+                try:
+                    ur = requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/articles?id=eq.{aid}",
+                        json=update_data,
+                        headers={
+                            "apikey": SUPABASE_KEY, 
+                            "Authorization": f"Bearer {SUPABASE_KEY}",
+                            "Content-Type": "application/json"
+                        }
+                    )
+                    if ur.status_code in [200, 204]:
+                        repaired += 1
+                        print(f"    ✅ Repaired article {aid}")
+                except Exception as e:
+                    print(f"    ❌ Update error: {e}")
+        
+        print(f"  ✅ Repaired {repaired} articles")
+        return repaired
+    except Exception as e:
+        print(f"  ❌ Repair error: {e}")
+        return 0
         
         articles = r.json()
         
@@ -288,7 +430,11 @@ def repair_articles():
                             )
                             if article_elem:
                                 content_text = article_elem.get_text(strip=True)
+                                # Clean up the content - remove age restriction warning and junk
                                 content_text = re.sub(r'限制級您即將進入之新聞內容需滿18歲.*?我同意', '', content_text)
+                                content_text = re.sub(r'我已年滿18歲進入根據.*?網站分級', '', content_text)
+                                content_text = re.sub(r'首頁>.*?>', '', content_text)
+                                content_text = content_text.strip()
                                 if content_text and len(content_text) > 50:
                                     update_data['content'] = content_text[:50000]
                                     needs_update = True
@@ -610,8 +756,11 @@ async def sync_ftv():
                             )
                             if article_elem:
                                 content_text = article_elem.get_text(strip=True)
-                                # Clean up the content - remove age restriction warning
+                                # Clean up the content - remove age restriction warning and other junk
                                 content_text = re.sub(r'限制級您即將進入之新聞內容需滿18歲.*?我同意', '', content_text)
+                                content_text = re.sub(r'我已年滿18歲進入根據.*?網站分級', '', content_text)
+                                content_text = re.sub(r'首頁>.*?>', '', content_text)  # Remove breadcrumb
+                                content_text = content_text.strip()
                                 if content_text and len(content_text) > 50:
                                     content = content_text
                         except Exception as e:
