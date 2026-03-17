@@ -931,3 +931,40 @@ footer {
 .related-section h3 {
   margin-bottom: 20px;
 }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 40px;
+  padding: 20px 0;
+}
+
+.page-btn {
+  padding: 10px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}

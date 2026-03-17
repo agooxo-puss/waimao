@@ -349,14 +349,24 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
   )
 }
 
-function App() {
+function HomePage() {
+  const { category, page } = useParams()
   const [articles, setArticles] = useState([])
-  const [category, setCategory] = useState("all")
+  const [currentCategory, setCurrentCategory] = useState(category || "all")
+  const [currentPage, setCurrentPage] = useState(parseInt(page) || 1)
   const [selectedArticle, setSelectedArticle] = useState(null)
   const [showAdmin, setShowAdmin] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    setCurrentCategory(category || "all")
+  }, [category])
+
+  useEffect(() => {
+    setCurrentPage(parseInt(page) || 1)
+  }, [page])
 
   const fetchArticles = async () => {
     setLoading(true)
@@ -387,9 +397,32 @@ function App() {
     }
   }
 
-  const filteredArticles = category === "all" 
+  const filteredArticles = currentCategory === "all" 
     ? articles 
-    : articles.filter(a => a.category === category)
+    : articles.filter(a => a.category === currentCategory)
+
+  const articlesPerPage = 12
+  const totalPages = Math.ceil(filteredArticles.length / articlesPerPage)
+  const startIndex = (currentPage - 1) * articlesPerPage
+  const displayedArticles = filteredArticles.slice(startIndex, startIndex + articlesPerPage)
+
+  const goToPage = (pageNum) => {
+    if (pageNum < 1 || pageNum > totalPages) return
+    if (currentCategory === "all") {
+      navigate(`/page/${pageNum}`)
+    } else {
+      navigate(`/category/${currentCategory}/page/${pageNum}`)
+    }
+  }
+
+  const selectCategory = (cat) => {
+    setCurrentCategory(cat)
+    if (cat === "all") {
+      navigate("/")
+    } else {
+      navigate(`/category/${cat}`)
+    }
+  }
 
   const isAdminSite = typeof window !== 'undefined' && window.location.hostname.includes('waimao')
 
@@ -433,44 +466,44 @@ function App() {
             <section className="categories">
               <div className="categories-inner container">
                 <button 
-                  className={`category-tab ${category === "all" ? "active" : ""}`}
-                  onClick={() => setCategory("all")}
+                  className={`category-tab ${currentCategory === "all" ? "active" : ""}`}
+                  onClick={() => selectCategory("all")}
                 >
                   全部
                 </button>
                 <button 
-                  className={`category-tab ${category === "world" ? "active" : ""}`}
-                  onClick={() => setCategory("world")}
+                  className={`category-tab ${currentCategory === "world" ? "active" : ""}`}
+                  onClick={() => selectCategory("world")}
                 >
                   國際
                 </button>
                 <button 
-                  className={`category-tab ${category === "tech" ? "active" : ""}`}
-                  onClick={() => setCategory("tech")}
+                  className={`category-tab ${currentCategory === "tech" ? "active" : ""}`}
+                  onClick={() => selectCategory("tech")}
                 >
                   科技
                 </button>
                 <button 
-                  className={`category-tab ${category === "sports" ? "active" : ""}`}
-                  onClick={() => setCategory("sports")}
+                  className={`category-tab ${currentCategory === "sports" ? "active" : ""}`}
+                  onClick={() => selectCategory("sports")}
                 >
                   體育
                 </button>
                 <button 
-                  className={`category-tab ${category === "culture" ? "active" : ""}`}
-                  onClick={() => setCategory("culture")}
+                  className={`category-tab ${currentCategory === "culture" ? "active" : ""}`}
+                  onClick={() => selectCategory("culture")}
                 >
                   文化
                 </button>
                 <button 
-                  className={`category-tab ${category === "business" ? "active" : ""}`}
-                  onClick={() => setCategory("business")}
+                  className={`category-tab ${currentCategory === "business" ? "active" : ""}`}
+                  onClick={() => selectCategory("business")}
                 >
                   香港
                 </button>
                 <button 
-                  className={`category-tab ${category === "macaodaily" ? "active" : ""}`}
-                  onClick={() => setCategory("macaodaily")}
+                  className={`category-tab ${currentCategory === "macaodaily" ? "active" : ""}`}
+                  onClick={() => selectCategory("macaodaily")}
                 >
                   澳門
                 </button>
@@ -478,9 +511,11 @@ function App() {
             </section>
 
             <section className="news-section container">
-              <h2 className="section-title">最新消息</h2>
+              <h2 className="section-title">
+                {currentCategory === "all" ? "最新消息" : categoryNames[currentCategory]}
+              </h2>
               <div className="news-grid">
-                {filteredArticles.map((article) => (
+                {displayedArticles.map((article) => (
                   <article 
                     key={article.id} 
                     className="news-card"
@@ -503,6 +538,28 @@ function App() {
                   </article>
                 ))}
               </div>
+              
+              {totalPages > 1 && (
+                <div className="pagination">
+                  <button 
+                    className="page-btn" 
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    上一頁
+                  </button>
+                  <span className="page-info">
+                    第 {currentPage} / {totalPages} 頁
+                  </span>
+                  <button 
+                    className="page-btn" 
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    下一頁
+                  </button>
+                </div>
+              )}
             </section>
           </>
         ) : (
@@ -649,7 +706,10 @@ export default function AppWrapper() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/category/:category" element={<HomePage />} />
+        <Route path="/page/:page" element={<HomePage />} />
+        <Route path="/category/:category/page/:page" element={<HomePage />} />
         <Route path="/article/:id" element={<ArticlePage />} />
       </Routes>
     </BrowserRouter>
