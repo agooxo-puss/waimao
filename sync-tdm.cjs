@@ -66,34 +66,46 @@ function cleanContent(content) {
   return cleanedLines.join('\n');
 }
 
-async function getBingImage(keyword) {
-  if (IMAGE_CACHE[keyword]) return IMAGE_CACHE[keyword];
+async function getBingImage(title, author = '') {
+  const cached = IMAGE_CACHE[title];
+  if (cached) return cached;
   
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   
   try {
-    const query = encodeURIComponent(keyword);
-    await page.goto(`https://www.bing.com/images/search?q=${query}`, { 
-      waitUntil: 'domcontentloaded', 
-      timeout: 15000 
-    });
-    await page.waitForTimeout(2000);
+    const keywords = [
+      title,
+      title.substring(0, 30),
+      title.split(/[，。！？]/)[0],
+      author ? `${author} ${title.substring(0, 15)}` : title.substring(0, 20)
+    ];
     
-    const images = await page.evaluate(() => {
-      const imgs = document.querySelectorAll('.mimg');
-      const urls = [];
-      imgs.forEach(img => {
-        if (img.src && img.src.startsWith('http') && img.src.includes('bing.net')) {
-          urls.push(img.src);
-        }
+    for (const keyword of keywords) {
+      const query = encodeURIComponent(keyword);
+      await page.goto(\`https://www.bing.com/images/search?q=\${query}\`, { 
+        waitUntil: 'networkidle', 
+        timeout: 20000 
       });
-      return urls.slice(0, 1);
-    });
+      await page.waitForTimeout(3000);
+      
+      const img = await page.evaluate(() => {
+        const imgs = document.querySelectorAll('.mimg');
+        for (const i of imgs) {
+          if (i.src && i.src.startsWith('http') && i.src.includes('bing.net')) {
+            return i.src;
+          }
+        }
+        return null;
+      });
+      
+      if (img) {
+        IMAGE_CACHE[title] = img;
+        return img;
+      }
+    }
     
-    const result = images[0] || null;
-    IMAGE_CACHE[keyword] = result;
-    return result;
+    return null;
   } catch (e) {
     return null;
   } finally {
@@ -236,7 +248,7 @@ async function main() {
       const rawContent = await getArticleContent(page, article.url);
       const content = cleanContent(rawContent);
       
-      const bingImage = await getBingImage(article.title);
+      const bingImage = await getBingImage(article.title, '澳廣視');
       
       await createArticle(article.title, article.title, content || article.title, bingImage);
       console.log('Created:', article.title, '| Content length:', content?.length || 0);
