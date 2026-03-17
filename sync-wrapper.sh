@@ -1,5 +1,7 @@
 #!/bin/bash
 cd /Users/whypuss/.kimaki/projects/kimaki/waimao
+echo "=== Syncing Cool3c ==="
+/opt/homebrew/bin/node sync-cool3c.cjs 2>&1
 echo "=== Syncing Macau Daily ==="
 /opt/homebrew/bin/node sync-playwright.cjs 2>&1
 echo "=== Syncing TDM ==="
