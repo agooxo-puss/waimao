@@ -273,7 +273,11 @@ async def sync_bbc():
                 content = clean_html(content)
                 
                 # Get image
-                image = await b.eval("document.querySelector('meta[property=\"og:image\"]')?.content") or ""
+                try:
+                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || document.querySelector('meta[name=image]')?.content || ''")
+                except:
+                    image = ""
+                image = image or ""
                 
                 # Get excerpt
                 excerpt = await b.eval("document.querySelector('meta[name=\"description\"]')?.content") or ""
@@ -355,7 +359,7 @@ async def sync_tvbs():
                 
                 # Get image
                 try:
-                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || ''")
+                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || document.querySelector('meta[name=image]')?.content || ''")
                 except:
                     image = ""
                 
@@ -448,7 +452,7 @@ async def sync_ftv():
                 
                 # Get image
                 try:
-                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || ''")
+                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || document.querySelector('meta[name=image]')?.content || ''")
                 except:
                     image = ""
                 
