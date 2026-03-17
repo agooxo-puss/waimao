@@ -210,6 +210,130 @@ def cleanup_duplicates():
         print(f"  ❌ Cleanup error: {e}")
         return 0
 
+def repair_articles():
+    """Repair articles with missing title, content, or image"""
+    print("🔧 Repairing articles with missing data...")
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    repaired = 0
+    
+    try:
+        # Get articles that need repair (no image, no content, or no url)
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/articles?select=*&order=created_at.desc&limit=100",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        )
+        if r.status_code != 200:
+            print("  ❌ Failed to fetch articles")
+            return 0
+        
+        articles = r.json()
+        
+        for a in articles:
+            needs_update = False
+            update_data = {}
+            aid = a.get('id')
+            title = a.get('title', '')
+            
+            # Check if image is missing or invalid
+            image = a.get('image')
+            if not image or image == 'None' or image == '':
+                print(f"  🔍 Article {aid}: Missing image - trying to fix...")
+                
+                # Try to find the article URL based on source
+                source = a.get('author', '')
+                url = a.get('url', '')
+                
+                # If no URL, try to search for the article
+                if not url or url == '':
+                    # Use title to search
+                    try:
+                        search_url = f"https://www.bing.com/search?q={requests.utils.quote(title)}"
+                        search_resp = requests.get(search_url, headers=headers, timeout=10)
+                        
+                        # Find ltn.com.tw links
+                        ltn_match = re.search(r'https://news\.ltn\.com\.tw/[^"\s]+', search_resp.text)
+                        if ltn_match:
+                            url = ltn_match.group(0)
+                            update_data['url'] = url
+                            needs_update = True
+                    except:
+                        pass
+                
+                # If we have URL, try to get image
+                if url:
+                    try:
+                        resp = requests.get(url, headers=headers, timeout=10)
+                        resp.encoding = 'utf-8'
+                        html = resp.text
+                        
+                        # Extract og:image
+                        og_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html)
+                        if not og_match:
+                            og_match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html)
+                        if og_match:
+                            image = og_match.group(1)
+                            update_data['image'] = image
+                            needs_update = True
+                            print(f"    ✅ Found image: {image[:40]}...")
+                        
+                        # Also try to get content if missing
+                        content = a.get('content', '')
+                        if not content or len(content) < 50:
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(html, 'lxml')
+                            article_elem = (
+                                soup.find('article') or 
+                                soup.find(class_='content940') or
+                                soup.find(class_=re.compile('content', re.I))
+                            )
+                            if article_elem:
+                                content_text = article_elem.get_text(strip=True)
+                                content_text = re.sub(r'限制級您即將進入之新聞內容需滿18歲.*?我同意', '', content_text)
+                                if content_text and len(content_text) > 50:
+                                    update_data['content'] = content_text[:50000]
+                                    needs_update = True
+                                    print(f"    ✅ Found content: {len(content_text)} chars")
+                    except Exception as e:
+                        print(f"    ❌ Error: {e}")
+                
+                # Last resort: use Bing Image Search
+                if not image or image == 'None':
+                    try:
+                        search_url = f"https://www.bing.com/images/search?q={requests.utils.quote(title)}&first=1"
+                        search_resp = requests.get(search_url, headers=headers, timeout=10)
+                        bing_match = re.search(r'mediaurl=([^&"]+)', search_resp.text)
+                        if bing_match:
+                            image = requests.utils.unquote(bing_match.group(1))
+                            update_data['image'] = image
+                            needs_update = True
+                            print(f"    ✅ Bing fallback image: {image[:40]}...")
+                    except:
+                        pass
+            
+            # Update if needed
+            if needs_update and update_data:
+                try:
+                    ur = requests.patch(
+                        f"{SUPABASE_URL}/rest/v1/articles?id=eq.{aid}",
+                        json=update_data,
+                        headers={
+                            "apikey": SUPABASE_KEY, 
+                            "Authorization": f"Bearer {SUPABASE_KEY}",
+                            "Content-Type": "application/json"
+                        }
+                    )
+                    if ur.status_code in [200, 204]:
+                        repaired += 1
+                        print(f"    ✅ Repaired article {aid}")
+                except Exception as e:
+                    print(f"    ❌ Update error: {e}")
+        
+        print(f"  ✅ Repaired {repaired} articles")
+        return repaired
+    except Exception as e:
+        print(f"  ❌ Repair error: {e}")
+        return 0
+
 def save_article(title, excerpt, content, category, author, image):
     """Save article to Supabase"""
     data = {
@@ -553,6 +677,9 @@ async def sync_all():
     print(f"🕐 Starting sync - {get_date_str()}")
     print("=" * 50)
     
+    # Repair articles with missing data BEFORE syncing
+    repair_articles()
+    
     # Clean duplicates before syncing
     cleanup_duplicates()
     
@@ -563,6 +690,9 @@ async def sync_all():
     
     # Clean duplicates after syncing
     cleanup_duplicates()
+    
+    # Final repair check after syncing
+    repair_articles()
     
     print("=" * 50)
     print("✅ All sync complete!")
@@ -1053,6 +1183,7 @@ def main():
     parser.add_argument("--monitor", action="store_true", help="Start web monitor on port 5000")
     parser.add_argument("--test", metavar="URL", help="Test a website")
     parser.add_argument("--screenshot", action="store_true", help="Take screenshot")
+    parser.add_argument("--repair", action="store_true", help="Repair articles with missing data")
     parser.add_argument("--port", type=int, default=5000, help="Port for web monitor")
     
     args = parser.parse_args()
@@ -1066,11 +1197,14 @@ def main():
         asyncio.run(test_website(args.test, args.screenshot))
     elif args.screenshot:
         asyncio.run(test_website("https://kimaki.vercel.app", True))
+    elif args.repair:
+        repair_articles()
     else:
         parser.print_help()
         print("\nExamples:")
         print("  python kimaki.py --monitor          # Start web monitor")
         print("  python kimaki.py --sync             # Sync news")
+        print("  python kimaki.py --repair           # Repair missing images/content")
         print("  python kimaki.py --test URL         # Test website")
         print("  python kimaki.py --screenshot       # Screenshot kimaki.vercel.app")
 
