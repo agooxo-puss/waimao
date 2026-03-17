@@ -396,97 +396,112 @@ async def sync_tvbs():
     print("✅ Taiwan news sync complete!")
 
 async def sync_ftv():
-    """Sync Taiwan news from CNA (中央社)"""
-    print("📺 Syncing CNA (中央社)...")
+    """Sync Taiwan news from 自由時報 (Liberty Times) via RSS"""
+    print("📺 Syncing 自由時報 (Liberty Times)...")
     
-    async with Browser(headless=True) as b:
-        # CNA (中央社) - Taiwan's official news agency
-        await b.goto("https://www.cna.com.tw/")
-        await b.wait(5000)
-        
-        html = await b.content()
-        
-        import re
-        
-        # Find news links - both absolute and relative
-        links = re.findall(r'href="(https?://[^"]+cna[^"]+)"', html, re.IGNORECASE)
-        # Also find relative links
-        rel_links = re.findall(r'href="(/[^"]+)"', html)
-        rel_links = [("https://www.cna.com.tw" + l).replace('&amp;', '&') for l in rel_links if '/a/' in l or '/aac/' in l]
-        
-        links = list(set(links + rel_links))[:10]
-        
-        print(f"  Found {len(links)} potential articles")
-        
-        for i, link in enumerate(links):
-            try:
-                await b.goto(link)
-                await b.wait(3000)
-                
-                # Get title
-                title = ""
-                for sel in ["h1", ".title", ".news-title", "title"]:
-                    try:
-                        title = await b.eval(f"document.querySelector('{sel}')?.textContent")
-                    except:
-                        pass
-                    if title and len(title or "") > 5:
-                        break
-                
-                title = (title or "").strip()
-                if not title or len(title) < 5:
-                    print(f"  ⏭️  Skip (no title)")
-                    continue
-                
-                # Check if exists
-                if article_exists(title):
-                    print(f"  ⏭️  Skip: {title[:40]}...")
-                    continue
-                
-                # Get content
+    rss_urls = [
+        ("https://news.ltn.com.tw/rss/all.xml", "taiwan"),
+        ("https://news.ltn.com.tw/rss/politics.xml", "taiwan"),
+        ("https://news.ltn.com.tw/rss/society.xml", "taiwan"),
+        ("https://news.ltn.com.tw/rss/world.xml", "world"),
+        ("https://news.ltn.com.tw/rss/sports.xml", "sports"),
+    ]
+    
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    
+    for rss_url, category in rss_urls:
+        try:
+            print(f"  📡 Fetching {rss_url}...")
+            resp = requests.get(rss_url, timeout=10, headers=headers)
+            resp.encoding = 'utf-8'
+            xml = resp.text
+            
+            # Parse RSS items
+            items = re.findall(r'<item>(.*?)</item>', xml, re.DOTALL)
+            print(f"     Found {len(items)} items")
+            
+            for item in items[:8]:  # Limit 8 per feed
                 try:
-                    content = await b.eval("document.querySelector('article')?.innerHTML || document.querySelector('.content')?.innerHTML || ''")
-                except:
-                    content = ""
-                content = clean_html(content)
-                
-                # Get image
-                try:
-                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || document.querySelector('meta[name=image]')?.content || ''")
-                except:
-                    image = ""
-                
-                # Get excerpt
-                try:
-                    excerpt = await b.eval("document.querySelector('meta[name=description]')?.content || ''")
-                except:
+                    # Extract title
+                    title_match = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>|<title>(.*?)</title>', item)
+                    title = ""
+                    if title_match:
+                        title = (title_match.group(1) or title_match.group(2) or "").strip()
+
+                    if not title or len(title) < 5:
+                        continue
+
+                    # Check if exists
+                    if article_exists(title):
+                        continue
+
+                    # Extract link
+                    link_match = re.search(r'<link>(.*?)</link>', item)
+                    link = link_match.group(1).strip() if link_match else ""
+
+                    # Extract description
+                    desc_match = re.search(r'<description><!\[CDATA\[(.*?)\]\]></description>|<description>(.*?)</description>', item)
                     excerpt = ""
-                
-                if not excerpt and content:
-                    try:
-                        from bs4 import BeautifulSoup
-                        excerpt = BeautifulSoup(content, 'lxml').get_text()[:200]
-                    except:
-                        excerpt = content[:200]
-                
-                # Category is taiwan
-                category = "taiwan"
-                link_lower = link.lower()
-                if any(x in link_lower for x in ['sport', 'nba', '足球', '籃球']):
-                    category = "sports"
-                elif any(x in link_lower for x in ['tech', '3c', 'digital']):
-                    category = "tech"
-                
-                if save_article(title, excerpt, content, category, "中央社", image):
-                    print(f"  ✅ Saved: {title[:40]}...")
-                else:
-                    print(f"  ❌ Failed: {title[:40]}...")
+                    if desc_match:
+                        excerpt = (desc_match.group(1) or desc_match.group(2) or "").strip()
+                    excerpt = re.sub(r'<[^>]+>', '', excerpt)[:200]
+
+                    # Extract image from RSS - try multiple methods
+                    img_match = re.search(r'<media:content.*?url="([^"]+)"', item)
+                    if not img_match:
+                        img_match = re.search(r'<enclosure.*?url="([^"]+)"', item)
+                    image = img_match.group(1) if img_match else ""
                     
-            except Exception as e:
-                print(f"  ❌ Error: {e}")
-                continue
+                    # ALWAYS visit article to get og:image (RSS doesn't have images)
+                    content = excerpt
+                    if link:
+                        try:
+                            # Use requests instead of browser for faster scraping
+                            article_resp = requests.get(link, headers=headers, timeout=10)
+                            article_resp.encoding = 'utf-8'
+                            html = article_resp.text
+                            
+                            # Extract og:image
+                            og_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html)
+                            if not og_match:
+                                og_match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html)
+                            if og_match:
+                                image = og_match.group(1)
+                            
+                            # Extract full article content
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(html, 'lxml')
+                            article_elem = soup.find('article') or soup.find(class_=re.compile('content|article'))
+                            if article_elem:
+                                content_text = article_elem.get_text(strip=True)
+                                if content_text and len(content_text) > 50:
+                                    content = content_text
+                        except Exception as e:
+                            pass
+                    
+                    # Skip if still no image - every article MUST have image
+                    if not image:
+                        print(f"    ⏭️  Skip (no image): {title[:30]}...")
+                        continue
+                    
+                    # Override category based on URL/feed
+                    cat = category
+                    if 'sports' in rss_url:
+                        cat = "sports"
+                    elif 'world' in rss_url:
+                        cat = "world"
+                    
+                    if save_article(title, excerpt, content, cat, "自由時報", image):
+                        print(f"    ✅ {title[:40]}...")
+                except Exception as e:
+                    print(f"    ❌ Error: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"  ❌ RSS error: {e}")
+            continue
     
-    print("✅ CNA sync complete!")
+    print("✅ 自由時報 sync complete!")
 
 async def sync_all():
     """Sync all sources"""

@@ -18,7 +18,7 @@ const categoryNames = {
 }
 
 function getImage(article) {
-  if (article.image) return article.image
+  if (article.image && article.image.startsWith('http')) return article.image
   return ''
 }
 
