@@ -452,34 +452,78 @@ async def sync_ftv():
                         img_match = re.search(r'<enclosure.*?url="([^"]+)"', item)
                     image = img_match.group(1) if img_match else ""
                     
-                    # ALWAYS visit article to get og:image (RSS doesn't have images)
+                    # ALWAYS visit article to get og:image and full content
                     content = excerpt
                     if link:
                         try:
-                            # Use requests instead of browser for faster scraping
                             article_resp = requests.get(link, headers=headers, timeout=10)
                             article_resp.encoding = 'utf-8'
                             html = article_resp.text
                             
-                            # Extract og:image
+                            # Method 1: Extract og:image from website
                             og_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html)
                             if not og_match:
                                 og_match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html)
                             if og_match:
                                 image = og_match.group(1)
                             
-                            # Extract full article content
+                            # Method 2: Try twitter:image as fallback
+                            if not image:
+                                twitter_match = re.search(r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']', html)
+                                if not twitter_match:
+                                    twitter_match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']', html)
+                                if twitter_match:
+                                    image = twitter_match.group(1)
+                            
+                            # Extract full article content - try multiple selectors
                             from bs4 import BeautifulSoup
                             soup = BeautifulSoup(html, 'lxml')
-                            article_elem = soup.find('article') or soup.find(class_=re.compile('content|article'))
+                            article_elem = (
+                                soup.find('article') or 
+                                soup.find(class_='content940') or
+                                soup.find(class_=re.compile('content', re.I)) or
+                                soup.find(id=re.compile('content', re.I))
+                            )
                             if article_elem:
                                 content_text = article_elem.get_text(strip=True)
+                                # Clean up the content - remove age restriction warning
+                                content_text = re.sub(r'限制級您即將進入之新聞內容需滿18歲.*?我同意', '', content_text)
                                 if content_text and len(content_text) > 50:
                                     content = content_text
                         except Exception as e:
                             pass
                     
-                    # Skip if still no image - every article MUST have image
+                    # ========== VALIDATION RULES ==========
+                    
+                    # Rule 1: Must have title (minimum 5 characters)
+                    if not title or len(title) < 5:
+                        print(f"    ⏭️  Skip (no valid title): {str(title)[:30]}...")
+                        continue
+                    
+                    # Rule 2: Must have content (minimum 50 characters)
+                    if not content or len(content) < 50:
+                        # Try to expand from excerpt
+                        if excerpt and len(excerpt) >= 50:
+                            content = excerpt
+                        else:
+                            print(f"    ⏭️  Skip (no content): {title[:30]}...")
+                            continue
+                    
+                    # Rule 3: Must have image
+                    if not image:
+                        # Fallback: Use Bing Image Search to find related image
+                        try:
+                            search_url = f"https://www.bing.com/images/search?q={requests.utils.quote(title)}&first=1"
+                            search_resp = requests.get(search_url, headers=headers, timeout=10)
+                            bing_match = re.search(r'mediaurl=([^&"]+)', search_resp.text)
+                            if bing_match:
+                                image = bing_match.group(1)
+                                # Clean up the URL
+                                image = requests.utils.unquote(image)
+                        except:
+                            pass
+                    
+                    # Final check: Skip if still no image
                     if not image:
                         print(f"    ⏭️  Skip (no image): {title[:30]}...")
                         continue
