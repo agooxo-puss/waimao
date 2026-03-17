@@ -38,7 +38,7 @@ CATEGORY_NAMES = {
     "world": "國際",
     "tech": "科技",
     "sports": "體育",
-    "culture": "文化",
+    "taiwan": "台灣",
     "business": "香港",
     "macaodaily": "澳門"
 }
@@ -286,8 +286,8 @@ async def sync_bbc():
                     category = "tech"
                 elif "business" in link:
                     category = "business"
-                elif "culture" in link:
-                    category = "culture"
+                elif "culture" in link or "taiwan" in link:
+                    category = "taiwan"
                 
                 if save_article(title, excerpt, content, category, "BBC中文", image):
                     print(f"  ✅ Saved: {title[:40]}...")
@@ -300,6 +300,105 @@ async def sync_bbc():
     
     print("✅ BBC sync complete!")
 
+async def sync_tvbs():
+    """Sync TVBS Taiwan news"""
+    print("📺 Syncing TVBS Taiwan...")
+    
+    async with Browser(headless=True) as b:
+        # TVBS main news page
+        await b.goto("https://www.tvbs.com.tw/news")
+        await b.wait(3000)
+        
+        # Get page content
+        html = await b.content()
+        
+        # Find news links - TVBS uses various selectors
+        links = []
+        
+        # Try common patterns
+        import re
+        
+        # Pattern 1: news detail links
+        pattern1 = re.findall(r'href="(https?://[^"]*tvbs[^"]*/news[^"]*)"', html, re.IGNORECASE)
+        # Pattern 2: article links  
+        pattern2 = re.findall(r'href="(https?://news\.tvbs\.com\.tw/[^"]+)"', html)
+        
+        links = list(set(pattern1 + pattern2))[:15]
+        
+        print(f"  Found {len(links)} potential articles")
+        
+        for i, link in enumerate(links):
+            try:
+                # Skip non-article pages
+                if any(x in link.lower() for x in ['video', 'program', 'columnist', 'author', 'tag', 'category', 'topic']):
+                    continue
+                    
+                await b.goto(link)
+                await b.wait(2000)
+                
+                # Get title
+                title = await b.eval("document.querySelector('h1')?.textContent") or ""
+                if not title:
+                    # Try alternate selectors
+                    title = await b.eval("document.querySelector('.title, .news-title, [class*=\"title\"]')?.textContent") or ""
+                
+                if not title or len(title) < 5:
+                    continue
+                
+                # Check if exists
+                if article_exists(title):
+                    print(f"  ⏭️  Skip: {title[:40]}...")
+                    continue
+                
+                # Get content
+                content = await b.eval("""
+                    document.querySelector('.content, .article-content, .news-content, article, [class*=\"content\"])?.innerHTML || 
+                    document.querySelector('[class*=\"article\"]')?.innerHTML || ''
+                """) or ""
+                content = clean_html(content)
+                
+                # Get image
+                image = await b.eval("""
+                    document.querySelector('meta[property=\"og:image\"]')?.content ||
+                    document.querySelector('.news-img img, .article-img img, article img')?.src || ''
+                """) or ""
+                
+                # Get excerpt
+                excerpt = await b.eval("""
+                    document.querySelector('meta[name=\"description\"]')?.content ||
+                    document.querySelector('meta[property=\"og:description\"]')?.content || ''
+                """) or ""
+                
+                if not excerpt and content:
+                    try:
+                        from bs4 import BeautifulSoup
+                        excerpt = BeautifulSoup(content, 'lxml').get_text()[:200]
+                    except:
+                        excerpt = content[:200]
+                
+                # Determine category - TVBS is primarily Taiwan news
+                category = "taiwan"
+                link_lower = link.lower()
+                if any(x in link_lower for x in ['tech', '3c', 'digital']):
+                    category = "tech"
+                elif any(x in link_lower for x in ['sport', 'nba', '足球', '籃球']):
+                    category = "sports"
+                elif any(x in link_lower for x in ['business', 'finance', 'money', '股票', '財經']):
+                    category = "business"
+                elif any(x in link_lower for x in ['world', 'global', '國際']):
+                    category = "world"
+                
+                if save_article(title, excerpt, content, category, "TVBS", image):
+                    print(f"  ✅ Saved: {title[:40]}...")
+                else:
+                    print(f"  ❌ Failed: {title[:40]}...")
+                    
+            except Exception as e:
+                print(f"  ❌ Error: {e}")
+                continue
+    
+    print("✅ TVBS sync complete!")
+
 async def sync_all():
     """Sync all sources"""
     print("=" * 50)
@@ -310,6 +409,7 @@ async def sync_all():
     cleanup_duplicates()
     
     await sync_bbc()
+    await sync_tvbs()
     # Add more sources here...
     
     # Clean duplicates after syncing
@@ -497,7 +597,7 @@ HTML = """
                         <option value="world">國際</option>
                         <option value="tech">科技</option>
                         <option value="sports">體育</option>
-                        <option value="culture">文化</option>
+                        <option value="taiwan">台灣</option>
                         <option value="business">香港</option>
                         <option value="macaodaily">澳門</option>
                     </select>

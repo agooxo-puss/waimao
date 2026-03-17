@@ -12,7 +12,7 @@ const categoryNames = {
   world: "國際",
   tech: "科技",
   sports: "體育",
-  culture: "文化",
+  taiwan: "台灣",
   business: "香港",
   macaodaily: "澳門"
 }
@@ -282,7 +282,7 @@ function AdminPanel({ onClose, onRefresh, articles, setArticles }) {
                   <option value="world">國際</option>
                   <option value="tech">科技</option>
                   <option value="sports">體育</option>
-                  <option value="culture">文化</option>
+                  <option value="taiwan">台灣</option>
                   <option value="business">香港</option>
                   <option value="macaodaily">澳門</option>
                 </select>
@@ -495,10 +495,10 @@ function HomePage() {
                   體育
                 </button>
                 <button 
-                  className={`category-tab ${currentCategory === "culture" ? "active" : ""}`}
-                  onClick={() => selectCategory("culture")}
+                  className={`category-tab ${currentCategory === "taiwan" ? "active" : ""}`}
+                  onClick={() => selectCategory("taiwan")}
                 >
-                  文化
+                  台灣
                 </button>
                 <button 
                   className={`category-tab ${currentCategory === "business" ? "active" : ""}`}
