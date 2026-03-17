@@ -354,6 +354,7 @@ function HomePage() {
   const [articles, setArticles] = useState([])
   const [currentCategory, setCurrentCategory] = useState(category || "all")
   const [currentPage, setCurrentPage] = useState(parseInt(page) || 1)
+  const [displayCount, setDisplayCount] = useState(12)
   const [selectedArticle, setSelectedArticle] = useState(null)
   const [showAdmin, setShowAdmin] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -389,6 +390,10 @@ function HomePage() {
     fetchArticles()
   }, [])
 
+  useEffect(() => {
+    setDisplayCount(12)
+  }, [currentCategory])
+
   const handleAdminClick = () => {
     if (isLoggedIn) {
       setShowAdmin(true)
@@ -401,18 +406,10 @@ function HomePage() {
     ? articles 
     : articles.filter(a => a.category === currentCategory)
 
-  const articlesPerPage = 12
-  const totalPages = Math.ceil(filteredArticles.length / articlesPerPage)
-  const startIndex = (currentPage - 1) * articlesPerPage
-  const displayedArticles = filteredArticles.slice(startIndex, startIndex + articlesPerPage)
+  const displayedArticles = filteredArticles.slice(0, displayCount)
 
-  const goToPage = (pageNum) => {
-    if (pageNum < 1 || pageNum > totalPages) return
-    if (currentCategory === "all") {
-      navigate(`/page/${pageNum}`)
-    } else {
-      navigate(`/category/${currentCategory}/page/${pageNum}`)
-    }
+  const loadMore = () => {
+    setDisplayCount(prev => prev + 12)
   }
 
   const selectCategory = (cat) => {
@@ -539,24 +536,10 @@ function HomePage() {
                 ))}
               </div>
               
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button 
-                    className="page-btn" 
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    上一頁
-                  </button>
-                  <span className="page-info">
-                    第 {currentPage} / {totalPages} 頁
-                  </span>
-                  <button 
-                    className="page-btn" 
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    下一頁
+              {displayedArticles.length < filteredArticles.length && (
+                <div className="load-more-container">
+                  <button className="load-more-btn" onClick={loadMore}>
+                    載入更多 ({filteredArticles.length - displayedArticles.length} 篇)
                   </button>
                 </div>
               )}

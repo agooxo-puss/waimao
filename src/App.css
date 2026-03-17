@@ -968,3 +968,28 @@ footer {
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
+
+/* Load More Button */
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  padding: 20px 0;
+}
+
+.load-more-btn {
+  padding: 14px 40px;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.load-more-btn:hover {
+  background: var(--accent);
+  color: white;
+}
