@@ -328,20 +328,15 @@ async def sync_tvbs():
                 
                 # Get title - try multiple selectors
                 title = ""
-                selectors = [
-                    "h1",
-                    "[class*='title']",
-                    ".article-title",
-                    ".news-title",
-                    "[itemprop='headline']",
-                    "title"
-                ]
-                for sel in selectors:
-                    title = await b.eval(f"document.querySelector('{sel}')?.textContent") or ""
-                    if title and len(title) > 5:
+                for sel in ["h1", ".title", ".news-title", "title"]:
+                    try:
+                        title = await b.eval(f"document.querySelector('{sel}')?.textContent")
+                    except:
+                        pass
+                    if title and len(title or "") > 5:
                         break
                 
-                title = title.strip()
+                title = (title or "").strip()
                 if not title or len(title) < 5:
                     print(f"  ⏭️  Skip (no title): {link[:50]}...")
                     continue
@@ -352,24 +347,23 @@ async def sync_tvbs():
                     continue
                 
                 # Get content
-                content = await b.eval("""
-                    document.querySelector('[class*="content"]')?.innerHTML ||
-                    document.querySelector('article')?.innerHTML ||
-                    document.querySelector('.article-detail')?.innerHTML || ''
-                """) or ""
+                try:
+                    content = await b.eval("document.querySelector('article')?.innerHTML || document.querySelector('.content')?.innerHTML || ''")
+                except:
+                    content = ""
                 content = clean_html(content)
                 
                 # Get image
-                image = await b.eval("""
-                    document.querySelector('meta[property="og:image"]')?.content ||
-                    document.querySelector('[class*="img"] img')?.src || ''
-                """) or ""
+                try:
+                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || ''")
+                except:
+                    image = ""
                 
                 # Get excerpt
-                excerpt = await b.eval("""
-                    document.querySelector('meta[name="description"]')?.content ||
-                    document.querySelector('meta[property="og:description"]')?.content || ''
-                """) or ""
+                try:
+                    excerpt = await b.eval("document.querySelector('meta[name=description]')?.content || ''")
+                except:
+                    excerpt = ""
                 
                 if not excerpt and content:
                     try:
