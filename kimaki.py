@@ -143,15 +143,72 @@ def get_date_str():
     return f"{datetime.now().year}年{datetime.now().month}月{datetime.now().day}日"
 
 def article_exists(title):
-    """Check if article already exists"""
+    """Check if article already exists by exact title match"""
+    if not title:
+        return False
     try:
+        # URL encode the title for the query
+        from urllib.parse import quote
+        encoded_title = quote(title, safe='')
         r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/articles?title=eq.{title}",
+            f"{SUPABASE_URL}/rest/v1/articles?title=eq.{encoded_title}",
             headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
         )
-        return bool(r.json())
-    except:
+        if r.status_code == 200:
+            data = r.json()
+            return len(data) > 0
         return False
+    except Exception as e:
+        print(f"  ⚠️  article_exists error: {e}")
+        return False
+
+def cleanup_duplicates():
+    """Remove duplicate articles - keep newest, delete older ones"""
+    print("🧹 Checking for duplicates...")
+    try:
+        # Get all articles ordered by created_at
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/articles?select=id,title,created_at&order=created_at.desc",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        )
+        if r.status_code != 200:
+            print("  ❌ Failed to fetch articles")
+            return 0
+        
+        articles = r.json()
+        seen_titles = {}
+        delete_ids = []
+        
+        # Find duplicates - keep newest
+        for a in articles:
+            title = a.get('title', '')
+            if not title:
+                continue
+            if title in seen_titles:
+                # This is a duplicate, mark for deletion
+                delete_ids.append(a['id'])
+            else:
+                seen_titles[title] = a['id']
+        
+        # Delete duplicates
+        deleted = 0
+        for aid in delete_ids:
+            try:
+                dr = requests.delete(
+                    f"{SUPABASE_URL}/rest/v1/articles?id=eq.{aid}",
+                    headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+                )
+                if dr.status_code in [200, 204]:
+                    deleted += 1
+            except:
+                pass
+        
+        if deleted > 0:
+            print(f"  ✅ Deleted {deleted} duplicate articles")
+        return deleted
+    except Exception as e:
+        print(f"  ❌ Cleanup error: {e}")
+        return 0
 
 def save_article(title, excerpt, content, category, author, image):
     """Save article to Supabase"""
@@ -249,8 +306,14 @@ async def sync_all():
     print(f"🕐 Starting sync - {get_date_str()}")
     print("=" * 50)
     
+    # Clean duplicates before syncing
+    cleanup_duplicates()
+    
     await sync_bbc()
     # Add more sources here...
+    
+    # Clean duplicates after syncing
+    cleanup_duplicates()
     
     print("=" * 50)
     print("✅ All sync complete!")
@@ -376,6 +439,7 @@ HTML = """
         <div class="actions">
             <button class="btn btn-primary" onclick="showTab('articles')">📰 文章管理</button>
             <button class="btn btn-success" onclick="runSync()">🔄 立即同步</button>
+            <button class="btn btn-warning" onclick="runCleanup()">🧹 清理重複</button>
             <button class="btn btn-info" onclick="showTab('add')">➕ 發布文章</button>
             <button class="btn btn-warning" onclick="showTab('test')">🧪 測試網站</button>
             <button class="btn btn-info" onclick="showTab('logs')">📋 日誌</button>
@@ -498,6 +562,19 @@ HTML = """
             }
         }
         
+        async function runCleanup() {
+            if (!confirm('確定要清理重複文章？')) return;
+            addLog('🧹 開始清理重複文章...');
+            try {
+                const res = await fetch('/api/cleanup');
+                const data = await res.json();
+                addLog('✅ 清理完成，刪除 ' + data.deleted + ' 篇');
+                loadArticles();
+            } catch(e) {
+                addLog('❌ 清理失敗: ' + e);
+            }
+        }
+        
         async function loadArticles() {
             const res = await fetch('/api/articles');
             const articles = await res.json();
@@ -598,6 +675,14 @@ def api_sync():
     # For now, just return a message
     add_log("✅ 同步完成 (mock)")
     return jsonify({"status": "ok", "message": "Sync completed"})
+
+@app.route('/api/cleanup')
+def api_cleanup():
+    """Clean up duplicates"""
+    add_log("🧹 開始清理重複文章...")
+    deleted = cleanup_duplicates()
+    add_log(f"✅ 清理完成，刪除 {deleted} 篇重複文章")
+    return jsonify({"status": "ok", "deleted": deleted})
 
 @app.route('/api/article', methods=['POST'])
 def api_add_article():
