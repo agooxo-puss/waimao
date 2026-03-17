@@ -392,12 +392,12 @@ async def sync_tvbs():
     print("✅ Taiwan news sync complete!")
 
 async def sync_ftv():
-    """Sync Taiwan news from Taiwan Hot (最受歡迎)"""
-    print("📺 Syncing Taiwan Hot (最受歡迎)...")
+    """Sync Taiwan news from CNA (中央社)"""
+    print("📺 Syncing CNA (中央社)...")
     
     async with Browser(headless=True) as b:
-        # Try Taiwan Hot page - often has most popular news
-        await b.goto("https://www.ttv.com.tw/news/hot/")
+        # CNA (中央社) - Taiwan's official news agency
+        await b.goto("https://www.cna.com.tw/")
         await b.wait(5000)
         
         html = await b.content()
@@ -405,9 +405,10 @@ async def sync_ftv():
         import re
         
         # Find news links
-        links = re.findall(r'href="(https?://[^\"]+)"', html)
-        # Filter for ttv news
-        links = [l for l in links if 'ttv' in l.lower() and 'news' in l.lower()][:10]
+        links = re.findall(r'href="(https?://[^"]+cna[^"]+)"', html, re.IGNORECASE)
+        links = [l.replace('&amp;', '&') for l in links]
+        # Filter for news articles
+        links = list(set([l for l in links if '/a/' in l or '/aac/' in l])[:10])
         
         print(f"  Found {len(links)} potential articles")
         
@@ -470,7 +471,7 @@ async def sync_ftv():
                 elif any(x in link_lower for x in ['tech', '3c', 'digital']):
                     category = "tech"
                 
-                if save_article(title, excerpt, content, category, "台灣熱門", image):
+                if save_article(title, excerpt, content, category, "中央社", image):
                     print(f"  ✅ Saved: {title[:40]}...")
                 else:
                     print(f"  ❌ Failed: {title[:40]}...")
@@ -479,7 +480,7 @@ async def sync_ftv():
                 print(f"  ❌ Error: {e}")
                 continue
     
-    print("✅ Taiwan Hot sync complete!")
+    print("✅ CNA sync complete!")
 
 async def sync_all():
     """Sync all sources"""
