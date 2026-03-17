@@ -408,7 +408,8 @@ async def sync_ftv():
         links = re.findall(r'href="(https?://[^"]+cna[^"]+)"', html, re.IGNORECASE)
         links = [l.replace('&amp;', '&') for l in links]
         # Filter for news articles
-        links = list(set([l for l in links if '/a/' in l or '/aac/' in l])[:10])
+        links = [l for l in links if '/a/' in l or '/aac/' in l]
+        links = list(set(links))[:10]
         
         print(f"  Found {len(links)} potential articles")
         
