@@ -391,6 +391,97 @@ async def sync_tvbs():
     
     print("✅ Taiwan news sync complete!")
 
+async def sync_ftv():
+    """Sync Taiwan news from FTV (民視新聞)"""
+    print("📺 Syncing FTV (民視新聞)...")
+    
+    async with Browser(headless=True) as b:
+        # FTV main news page
+        await b.goto("https://www.ftvnews.com.tw/")
+        await b.wait(5000)
+        
+        html = await b.content()
+        
+        import re
+        
+        # Find news links
+        links = re.findall(r'href="(https?://[^\"]+ftvnews[^\"]+)"', html, re.IGNORECASE)
+        links = [l.replace('&amp;', '&') for l in links]
+        # Filter for actual news articles
+        links = list(set([l for l in links if ('news' in l.lower() or 'A' in l) and 'category' not in l.lower() and 'tag' not in l.lower() and 'video' not in l.lower()]))[:10]
+        
+        print(f"  Found {len(links)} potential articles")
+        
+        for i, link in enumerate(links):
+            try:
+                await b.goto(link)
+                await b.wait(3000)
+                
+                # Get title
+                title = ""
+                for sel in ["h1", ".title", ".news-title", "title"]:
+                    try:
+                        title = await b.eval(f"document.querySelector('{sel}')?.textContent")
+                    except:
+                        pass
+                    if title and len(title or "") > 5:
+                        break
+                
+                title = (title or "").strip()
+                if not title or len(title) < 5:
+                    print(f"  ⏭️  Skip (no title)")
+                    continue
+                
+                # Check if exists
+                if article_exists(title):
+                    print(f"  ⏭️  Skip: {title[:40]}...")
+                    continue
+                
+                # Get content
+                try:
+                    content = await b.eval("document.querySelector('article')?.innerHTML || document.querySelector('.content')?.innerHTML || ''")
+                except:
+                    content = ""
+                content = clean_html(content)
+                
+                # Get image
+                try:
+                    image = await b.eval("document.querySelector('meta[property=og:image]')?.content || ''")
+                except:
+                    image = ""
+                
+                # Get excerpt
+                try:
+                    excerpt = await b.eval("document.querySelector('meta[name=description]')?.content || ''")
+                except:
+                    excerpt = ""
+                
+                if not excerpt and content:
+                    try:
+                        from bs4 import BeautifulSoup
+                        excerpt = BeautifulSoup(content, 'lxml').get_text()[:200]
+                    except:
+                        excerpt = content[:200]
+                
+                # Category is taiwan
+                category = "taiwan"
+                link_lower = link.lower()
+                if any(x in link_lower for x in ['sport', 'nba', '足球', '籃球']):
+                    category = "sports"
+                elif any(x in link_lower for x in ['tech', '3c', 'digital']):
+                    category = "tech"
+                
+                if save_article(title, excerpt, content, category, "民視新聞", image):
+                    print(f"  ✅ Saved: {title[:40]}...")
+                else:
+                    print(f"  ❌ Failed: {title[:40]}...")
+                    
+            except Exception as e:
+                print(f"  ❌ Error: {e}")
+                continue
+    
+    print("✅ FTV sync complete!")
+
 async def sync_all():
     """Sync all sources"""
     print("=" * 50)
@@ -402,6 +493,7 @@ async def sync_all():
     
     await sync_bbc()
     await sync_tvbs()
+    await sync_ftv()
     # Add more sources here...
     
     # Clean duplicates after syncing
