@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Main sync service - runs on schedule
+  sync:
+    build: .
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL:-https://sjokgfqpyuzrhuvrnvcz.supabase.co}
+      - SUPABASE_KEY=${SUPABASE_KEY:-sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_}
+    command: python sync_all.py
+    restart: unless-stopped
+
+  # Cron scheduler for automatic sync
+  scheduler:
+    image: alpine:latest
+    volumes:
+      - ./:/app
+    command: |
+      sh -c "apk add --no-cache tzdata fcron && \
+             echo '0 * * * * cd /app && python sync_all.py >> /app/logs/sync.log 2>&1' > /etc/crontabs/root && \
+             crond -f -l 2"
+    restart: unless-stopped
+
+  # Web interface for monitoring (optional)
+  monitor:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL:-https://sjokgfqpyuzrhuvrnvcz.supabase.co}
+      - SUPABASE_KEY=${SUPABASE_KEY:-sb_publishable_0shlrzPR6MoWE5td6BO3Pg_onhIIWK_}
+    command: python -m http.server 8080 -d /app/data
+    restart: unless-stopped

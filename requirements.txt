@@ -1,0 +1,27 @@
+# Core dependencies
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# HTTP requests
+requests>=2.31.0
+httpx>=0.25.0
+
+# Data processing
+python-dateutil>=2.8.0
+
+# Async support
+aiohttp>=3.9.0
+asyncio>=3.4.3
+
+# Optional: for better HTML parsing
+selectolax>=0.3.0
+
+# For Supabase
+supabase>=2.0.0
+
+# Web server
+flask>=3.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
