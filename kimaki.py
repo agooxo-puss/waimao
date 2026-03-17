@@ -404,12 +404,13 @@ async def sync_ftv():
         
         import re
         
-        # Find news links
+        # Find news links - both absolute and relative
         links = re.findall(r'href="(https?://[^"]+cna[^"]+)"', html, re.IGNORECASE)
-        links = [l.replace('&amp;', '&') for l in links]
-        # Filter for news articles
-        links = [l for l in links if '/a/' in l or '/aac/' in l]
-        links = list(set(links))[:10]
+        # Also find relative links
+        rel_links = re.findall(r'href="(/[^"]+)"', html)
+        rel_links = [("https://www.cna.com.tw" + l).replace('&amp;', '&') for l in rel_links if '/a/' in l or '/aac/' in l]
+        
+        links = list(set(links + rel_links))[:10]
         
         print(f"  Found {len(links)} potential articles")
         
